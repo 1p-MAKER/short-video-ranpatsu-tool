@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import ssl
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -15,6 +16,7 @@ class GeminiClipAnalyzer:
         self.model = model
         self.prompt_path = prompt_path
         self.json_repair = json_repair
+        self.ssl_context = self._build_ssl_context()
 
     def select_clips(
         self,
@@ -80,7 +82,7 @@ class GeminiClipAnalyzer:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=timeout_sec) as res:
+            with urllib.request.urlopen(req, timeout=timeout_sec, context=self.ssl_context) as res:
                 body = res.read().decode("utf-8")
         except urllib.error.HTTPError as exc:  # pragma: no cover
             detail = ""
@@ -188,3 +190,11 @@ class GeminiClipAnalyzer:
             return body[object_start : object_end + 1]
 
         return body
+
+    def _build_ssl_context(self) -> ssl.SSLContext:
+        try:
+            import certifi
+
+            return ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            return ssl.create_default_context()
