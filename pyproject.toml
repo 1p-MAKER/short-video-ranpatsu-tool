@@ -40,6 +40,9 @@ pcf = "podcast_clip_factory.app:main"
 pythonpath = ["src"]
 testpaths = ["tests"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/podcast_clip_factory"]
+
 [tool.ruff]
 line-length = 100
 
