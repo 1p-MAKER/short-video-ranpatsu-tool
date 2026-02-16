@@ -13,13 +13,16 @@ def build_filtergraph(
     safe_title = (
         title_text.replace("\\", r"\\")
         .replace(":", r"\\:")
+        .replace(",", r"\,")
         .replace("'", r"\\'")
         .replace("%", r"\\%")
     )
-    subtitle_filter = ""
+    subtitle_filter = "[base_with_text]"
     if subtitle_path:
         safe_sub_path = subtitle_path.replace("\\", r"\\").replace(":", r"\\:")
-        subtitle_filter = f",ass='{safe_sub_path}'"
+        subtitle_filter = f"ass='{safe_sub_path}'[v]"
+    else:
+        subtitle_filter = "null[v]"
 
     return (
         f"[0:v]scale={video_width}:{video_height}:force_original_aspect_ratio=increase,"
@@ -28,6 +31,6 @@ def build_filtergraph(
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base];"
         f"[base]drawbox=x=0:y=0:w=iw:h=170:color=black@0.45:t=fill,"
         f"drawtext=font='Hiragino Sans':text='{safe_title}':"
-        f"x=(w-text_w)/2:y=58:fontsize=56:fontcolor=white,"
-        f"{subtitle_filter}[v]"
+        f"x=(w-text_w)/2:y=58:fontsize=56:fontcolor=white[base_with_text];"
+        f"[base_with_text]{subtitle_filter}"
     )
