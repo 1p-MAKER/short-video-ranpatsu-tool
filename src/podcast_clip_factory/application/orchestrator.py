@@ -16,8 +16,8 @@ class AppOrchestrator:
         self.store = store
         self.logger = logger
 
-    def run_pipeline(self, input_video: Path, on_progress=None):
-        return self.executor.run(input_video=input_video, on_progress=on_progress)
+    def run_pipeline(self, input_video: Path, on_progress=None, on_log=None):
+        return self.executor.run(input_video=input_video, on_progress=on_progress, on_log=on_log)
 
     def get_review_rows(self, job_id: str) -> list[dict]:
         return self.repo.get_review_rows(job_id)

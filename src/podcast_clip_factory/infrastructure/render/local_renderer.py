@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -28,11 +29,13 @@ class LocalFFmpegRenderer:
         output_dir: Path,
         candidates: list[ClipCandidate],
         transcript: Transcript,
+        on_event: Callable[[str, int, int, str], None] | None = None,
     ) -> list[RenderedClip]:
         clips_dir = output_dir / "clips"
         subtitle_dir = output_dir / "subtitles"
         clips_dir.mkdir(parents=True, exist_ok=True)
         subtitle_dir.mkdir(parents=True, exist_ok=True)
+        total = len(candidates)
 
         with ThreadPoolExecutor(max_workers=self.app_config.render_parallelism) as executor:
             future_map = {
@@ -44,6 +47,8 @@ class LocalFFmpegRenderer:
                     clips_dir,
                     subtitle_dir,
                     transcript,
+                    total,
+                    on_event,
                 ): idx
                 for idx, candidate in enumerate(candidates, start=1)
             }
@@ -64,6 +69,8 @@ class LocalFFmpegRenderer:
         clips_dir: Path,
         subtitle_dir: Path,
         transcript: Transcript,
+        total: int,
+        on_event: Callable[[str, int, int, str], None] | None,
     ) -> RenderedClip:
         safe_title = sanitize_filename(candidate.title)
         clip_filename = f"clip_{idx:02d}_{safe_title}.mp4"
@@ -71,20 +78,31 @@ class LocalFFmpegRenderer:
         output_path = clips_dir / clip_filename
         subtitle_path = subtitle_dir / subtitle_filename
 
+        if on_event:
+            on_event("started", idx, total, candidate.title)
+
         self.subtitle_generator.generate(subtitle_path, candidate, transcript)
         cmd = self.command_builder.build(input_video, output_path, subtitle_path, candidate)
 
         try:
             run_command(cmd)
         except Exception:
-            fallback = self.command_builder.build(
-                input_video,
-                output_path,
-                subtitle_path,
-                candidate,
-                fallback_software_codec=True,
-            )
-            run_command(fallback)
+            try:
+                fallback = self.command_builder.build(
+                    input_video,
+                    output_path,
+                    subtitle_path,
+                    candidate,
+                    fallback_software_codec=True,
+                )
+                run_command(fallback)
+            except Exception:
+                if on_event:
+                    on_event("failed", idx, total, candidate.title)
+                raise
+
+        if on_event:
+            on_event("completed", idx, total, candidate.title)
 
         return RenderedClip(
             clip_id=candidate.clip_id,

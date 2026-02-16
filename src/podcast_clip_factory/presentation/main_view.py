@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 
 import flet as ft
@@ -19,6 +20,14 @@ class MainView(ft.Column):
 
         self.selected_video: Path | None = None
         self.current_job_id: str | None = None
+        self._worker_thread: threading.Thread | None = None
+        self._heartbeat_thread: threading.Thread | None = None
+        self._heartbeat_stop = threading.Event()
+        self._job_running = False
+        self._job_started_at = 0.0
+        self._last_progress_at = 0.0
+        self._last_progress_message = ""
+        self._log_lines: list[str] = []
 
         self.file_picker = ft.FilePicker()
         self._page.services.append(self.file_picker)
@@ -28,6 +37,16 @@ class MainView(ft.Column):
         self.start_button = ft.ElevatedButton("自動生成を開始", disabled=True, on_click=self._on_start)
 
         self.progress_view = ProgressView()
+        self.runtime_text = ft.Text("稼働状態: 待機", size=13, color=ft.Colors.BLUE_GREY_700)
+        self.estimate_text = ft.Text("目安: 50分動画で約15〜25分", size=12, color=ft.Colors.BLUE_GREY_500)
+        self.log_box = ft.TextField(
+            label="処理ログ（最新100行）",
+            value="",
+            read_only=True,
+            multiline=True,
+            min_lines=8,
+            max_lines=12,
+        )
         self.review_view = ReviewView()
         self.result_view = ResultView()
 
@@ -43,6 +62,9 @@ class MainView(ft.Column):
                 self.path_text,
                 ft.Divider(),
                 self.progress_view,
+                self.runtime_text,
+                self.estimate_text,
+                self.log_box,
                 ft.Divider(),
                 self.review_view,
                 self.submit_button,
@@ -73,7 +95,12 @@ class MainView(ft.Column):
         self.review_view.controls.clear()
         self.result_view.summary.value = ""
         self.result_view.path_text.value = ""
+        self._log_lines = []
+        self.log_box.value = ""
+        self._last_progress_message = ""
         self.progress_view.set("ジョブ開始", 0.01)
+        self._set_running(True)
+        self._append_log("ジョブを開始しました")
         self._page.update()
 
         def worker() -> None:
@@ -83,6 +110,7 @@ class MainView(ft.Column):
                     on_progress=lambda msg, p: self._page.call_from_thread(
                         self._update_progress, msg, p
                     ),
+                    on_log=lambda line: self._page.call_from_thread(self._append_log, line),
                 )
                 rows = self.orchestrator.get_review_rows(result.job.job_id)
                 self.current_job_id = result.job.job_id
@@ -91,16 +119,23 @@ class MainView(ft.Column):
                 self.logger.exception("ui.pipeline_failed", error=str(exc))
                 self._page.call_from_thread(self._on_error, str(exc))
 
-        threading.Thread(target=worker, daemon=True).start()
+        self._worker_thread = threading.Thread(target=worker, daemon=True)
+        self._worker_thread.start()
 
     def _update_progress(self, message: str, value: float) -> None:
+        self._last_progress_at = time.time()
         self.progress_view.set(message, value)
+        if message != self._last_progress_message:
+            self._append_log(f"進捗更新: {message} ({int(value * 100)}%)")
+            self._last_progress_message = message
         self._page.update()
 
     def _show_review_rows(self, rows: list[dict]) -> None:
         self.review_view.load_rows(rows)
         self.submit_button.visible = True
         self.progress_view.set("最終チェックで採用可否・タイトルを確認してください", 1.0)
+        self._append_log("最終チェックに進みました")
+        self._set_running(False)
         self._page.update()
 
     def _on_submit(self, _: ft.ControlEvent) -> None:
@@ -124,9 +159,73 @@ class MainView(ft.Column):
         self.pick_button.disabled = False
         self.submit_button.visible = False
         self._toast(f"エラー: {message}")
+        self._append_log(f"エラー: {message}")
+        self._set_running(False)
         self._page.update()
 
     def _toast(self, text: str) -> None:
         self.snack.content = ft.Text(text)
         self.snack.open = True
         self._page.update()
+
+    def _set_running(self, running: bool) -> None:
+        if running:
+            now = time.time()
+            self._job_running = True
+            self._job_started_at = now
+            self._last_progress_at = now
+            self._start_heartbeat()
+            return
+
+        self._job_running = False
+        self._stop_heartbeat()
+        self.runtime_text.value = "稼働状態: 待機"
+
+    def _start_heartbeat(self) -> None:
+        self._stop_heartbeat()
+        self._heartbeat_stop = threading.Event()
+
+        def heartbeat() -> None:
+            while not self._heartbeat_stop.wait(1.0):
+                self._page.call_from_thread(self._refresh_runtime_status)
+
+        self._heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
+        self._heartbeat_thread.start()
+
+    def _stop_heartbeat(self) -> None:
+        self._heartbeat_stop.set()
+        self._heartbeat_thread = None
+
+    def _refresh_runtime_status(self) -> None:
+        if not self._job_running:
+            return
+
+        now = time.time()
+        elapsed = int(now - self._job_started_at)
+        since_update = int(now - self._last_progress_at)
+        worker_alive = self._worker_thread.is_alive() if self._worker_thread else False
+
+        if worker_alive and since_update < 45:
+            state = "実行中"
+        elif worker_alive:
+            state = "実行中（重い処理継続中）"
+        else:
+            state = "停止"
+
+        self.runtime_text.value = (
+            f"稼働状態: {state} / 経過: {self._format_elapsed(elapsed)} / "
+            f"最終更新: {since_update}秒前"
+        )
+        self._page.update()
+
+    def _append_log(self, line: str) -> None:
+        stamp = time.strftime("%H:%M:%S")
+        self._log_lines.append(f"[{stamp}] {line}")
+        self._log_lines = self._log_lines[-100:]
+        self.log_box.value = "\n".join(self._log_lines)
+        self._page.update()
+
+    def _format_elapsed(self, total_sec: int) -> str:
+        mins = total_sec // 60
+        secs = total_sec % 60
+        return f"{mins:02d}:{secs:02d}"
