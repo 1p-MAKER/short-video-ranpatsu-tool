@@ -97,7 +97,7 @@ def load_settings(root_dir: Path) -> Settings:
             fallback=str(trans["fallback"]),
             word_timestamps=bool(trans["word_timestamps"]),
             mlx_model=os.getenv("MLX_WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo"),
-            faster_model=os.getenv("FASTER_WHISPER_MODEL", "large-v3"),
+            faster_model=os.getenv("FASTER_WHISPER_MODEL", "small"),
         ),
         llm=LLMConfig(
             primary=str(llm["primary"]),
