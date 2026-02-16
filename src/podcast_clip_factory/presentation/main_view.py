@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -20,6 +21,7 @@ class MainView(ft.Column):
 
         self.selected_video: Path | None = None
         self.current_job_id: str | None = None
+        self._last_final_dir: Path | None = None
         self._worker_thread: threading.Thread | None = None
         self._heartbeat_thread: threading.Thread | None = None
         self._heartbeat_stop = threading.Event()
@@ -49,6 +51,11 @@ class MainView(ft.Column):
         )
         self.review_view = ReviewView()
         self.result_view = ResultView()
+        self.open_output_button = ft.OutlinedButton(
+            "出力フォルダを開く",
+            visible=False,
+            on_click=self._on_open_output,
+        )
 
         self.submit_button = ft.ElevatedButton("この内容で確定出力", visible=False, on_click=self._on_submit)
         self.snack = ft.SnackBar(ft.Text(""))
@@ -70,6 +77,7 @@ class MainView(ft.Column):
                 self.submit_button,
                 ft.Divider(),
                 self.result_view,
+                self.open_output_button,
             ],
             spacing=12,
             scroll=ft.ScrollMode.AUTO,
@@ -95,6 +103,8 @@ class MainView(ft.Column):
         self.review_view.controls.clear()
         self.result_view.summary.value = ""
         self.result_view.path_text.value = ""
+        self._last_final_dir = None
+        self.open_output_button.visible = False
         self._log_lines = []
         self.log_box.value = ""
         self._last_progress_message = ""
@@ -144,7 +154,9 @@ class MainView(ft.Column):
         decisions: list[ReviewDecision] = self.review_view.collect_decisions()
         payload = self.orchestrator.finalize_review(self.current_job_id, decisions)
         final_dir = self.orchestrator.store.final_dir(self.current_job_id)
+        self._last_final_dir = final_dir
         self.result_view.set_result(payload["selected_count"], str(final_dir))
+        self.open_output_button.visible = True
         self.start_button.disabled = False
         self.pick_button.disabled = False
         self.submit_button.visible = False
@@ -165,6 +177,17 @@ class MainView(ft.Column):
         self.snack.content = ft.Text(text)
         self.snack.open = True
         self._page.update()
+
+    def _on_open_output(self, _: ft.ControlEvent) -> None:
+        if self._last_final_dir is None or not self._last_final_dir.exists():
+            self._toast("出力フォルダが見つかりません")
+            return
+
+        try:
+            subprocess.run(["open", str(self._last_final_dir)], check=True)
+            self._append_log(f"出力フォルダを開きました: {self._last_final_dir}")
+        except Exception as exc:
+            self._toast(f"フォルダを開けませんでした: {exc}")
 
     def _set_running(self, running: bool) -> None:
         if running:
