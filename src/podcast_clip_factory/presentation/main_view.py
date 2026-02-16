@@ -155,7 +155,35 @@ class MainView(ft.Column):
             return
 
         decisions: list[ReviewDecision] = self.review_view.collect_decisions()
-        payload = self.orchestrator.finalize_review(self.current_job_id, decisions)
+        title_style = self.review_view.collect_title_style()
+        self.submit_button.disabled = True
+        self.start_button.disabled = True
+        self.pick_button.disabled = True
+        self.progress_view.set("確定出力レンダリング中", 0.99)
+        self._append_log("確定出力を開始しました（タイトル編集内容を反映）")
+        self._set_running(True)
+        self._page.update()
+
+        def worker() -> None:
+            try:
+                payload = self.orchestrator.finalize_review(
+                    self.current_job_id,
+                    decisions,
+                    title_style=title_style,
+                    on_log=lambda line: self._dispatch_ui(self._append_log, line),
+                )
+                self._dispatch_ui(self._on_submit_success, payload)
+            except Exception as exc:
+                self.logger.exception("ui.finalize_failed", error=str(exc))
+                self._dispatch_ui(self._on_error, str(exc))
+
+        self._worker_thread = threading.Thread(target=worker, daemon=True)
+        self._worker_thread.start()
+
+    def _on_submit_success(self, payload: dict) -> None:
+        if not self.current_job_id:
+            self._on_error("ジョブ情報が見つかりません")
+            return
         final_dir = self.orchestrator.store.final_dir(self.current_job_id)
         self._last_final_dir = final_dir
         self.result_view.set_result(payload["selected_count"], str(final_dir))
@@ -163,6 +191,9 @@ class MainView(ft.Column):
         self.start_button.disabled = False
         self.pick_button.disabled = False
         self.submit_button.visible = False
+        self.submit_button.disabled = False
+        self.progress_view.set("確定出力が完了しました", 1.0)
+        self._set_running(False)
         self._toast("確定出力が完了しました")
         self._page.update()
 
@@ -170,6 +201,7 @@ class MainView(ft.Column):
         self.progress_view.set("失敗", 0.0)
         self.start_button.disabled = False
         self.pick_button.disabled = False
+        self.submit_button.disabled = False
         self.submit_button.visible = False
         self._toast(f"エラー: {message}")
         self._append_log(f"エラー: {message}")

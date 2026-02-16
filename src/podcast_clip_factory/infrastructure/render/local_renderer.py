@@ -4,7 +4,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from podcast_clip_factory.domain.models import ClipCandidate, RenderedClip, Transcript
+from podcast_clip_factory.domain.models import ClipCandidate, RenderedClip, TitleOverlayStyle, Transcript
 from podcast_clip_factory.infrastructure.render.ffmpeg_builder import FFmpegCommandBuilder
 from podcast_clip_factory.infrastructure.render.subtitle_generator import SubtitleGenerator
 from podcast_clip_factory.utils.config import AppConfig
@@ -31,6 +31,7 @@ class LocalFFmpegRenderer:
         output_dir: Path,
         candidates: list[ClipCandidate],
         transcript: Transcript,
+        title_style: TitleOverlayStyle | None = None,
         on_event: Callable[[str, int, int, str], None] | None = None,
     ) -> list[RenderedClip]:
         clips_dir = output_dir / "clips"
@@ -51,6 +52,7 @@ class LocalFFmpegRenderer:
                     clips_dir,
                     subtitle_dir,
                     transcript,
+                    title_style,
                     total,
                     on_event,
                 ): idx
@@ -73,6 +75,7 @@ class LocalFFmpegRenderer:
         clips_dir: Path,
         subtitle_dir: Path | None,
         transcript: Transcript,
+        title_style: TitleOverlayStyle | None,
         total: int,
         on_event: Callable[[str, int, int, str], None] | None,
     ) -> RenderedClip:
@@ -89,17 +92,24 @@ class LocalFFmpegRenderer:
 
         if subtitle_path is not None:
             self.subtitle_generator.generate(subtitle_path, candidate, transcript)
-        cmd = self.command_builder.build(input_video, output_path, subtitle_path, candidate)
+        cmd = self.command_builder.build(
+            input_video=input_video,
+            output_video=output_path,
+            subtitle_path=subtitle_path,
+            candidate=candidate,
+            title_style=title_style,
+        )
 
         try:
             run_command(cmd)
         except Exception:
             try:
                 fallback = self.command_builder.build(
-                    input_video,
-                    output_path,
-                    subtitle_path,
-                    candidate,
+                    input_video=input_video,
+                    output_video=output_path,
+                    subtitle_path=subtitle_path,
+                    candidate=candidate,
+                    title_style=title_style,
                     fallback_software_codec=True,
                 )
                 run_command(fallback)

@@ -78,6 +78,16 @@ class ReviewDecision:
 
 
 @dataclass(slots=True)
+class TitleOverlayStyle:
+    font_name: str = "Hiragino Sans W6"
+    font_size: int = 56
+    y: int = 58
+    background: bool = True
+    background_opacity: float = 0.55
+    background_padding: int = 18
+
+
+@dataclass(slots=True)
 class MediaInfo:
     duration_sec: float
     width: int
