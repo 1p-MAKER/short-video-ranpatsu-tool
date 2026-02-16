@@ -15,12 +15,13 @@ class HeuristicClipAnalyzer:
         max_sec: int,
     ) -> list[ClipCandidate]:
         segments = transcript.segments
-        if not segments:
-            return []
-
-        total = transcript.duration_sec or media_info.duration_sec or segments[-1].end
+        total = transcript.duration_sec or media_info.duration_sec
+        if total <= 0 and segments:
+            total = segments[-1].end
         if total <= 0:
             return []
+        if not segments:
+            return self._fallback_without_transcript(total, target_count, min_sec, max_sec)
 
         window = float(max_sec)
         step = max(float(min_sec), total / max(target_count, 1))
@@ -46,6 +47,40 @@ class HeuristicClipAnalyzer:
                     hook=text[:100],
                     reason="クラウドAPI未使用時のヒューリスティック抽出",
                     score=max(0.2, 0.8 - idx * 0.03),
+                )
+            )
+            idx += 1
+            cursor += step
+
+        return candidates
+
+    def _fallback_without_transcript(
+        self,
+        total_duration: float,
+        target_count: int,
+        min_sec: int,
+        max_sec: int,
+    ) -> list[ClipCandidate]:
+        candidates: list[ClipCandidate] = []
+        window = float(max_sec)
+        step = max(float(min_sec), total_duration / max(target_count, 1))
+        cursor = 0.0
+        idx = 1
+
+        while len(candidates) < target_count and cursor + min_sec <= total_duration:
+            start = cursor
+            end = min(total_duration, start + window)
+            if end - start < min_sec:
+                break
+            candidates.append(
+                ClipCandidate(
+                    clip_id=f"heuristic_{idx:02d}",
+                    start_sec=start,
+                    end_sec=end,
+                    title=f"切り抜き {idx}",
+                    hook="文字起こしが空のため時間窓で抽出",
+                    reason="文字起こし空のフォールバック抽出",
+                    score=max(0.15, 0.6 - idx * 0.03),
                 )
             )
             idx += 1
