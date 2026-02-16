@@ -13,7 +13,7 @@ from podcast_clip_factory.presentation.review_view import ReviewView
 
 class MainView(ft.Column):
     def __init__(self, page: ft.Page, orchestrator, logger) -> None:
-        self.page = page
+        self._page = page
         self.orchestrator = orchestrator
         self.logger = logger
 
@@ -21,7 +21,7 @@ class MainView(ft.Column):
         self.current_job_id: str | None = None
 
         self.file_picker = ft.FilePicker(on_result=self._on_pick_result)
-        self.page.overlay.append(self.file_picker)
+        self._page.overlay.append(self.file_picker)
 
         self.path_text = ft.Text("動画未選択", size=13)
         self.pick_button = ft.ElevatedButton("動画を選択", on_click=self._on_pick_clicked)
@@ -33,7 +33,7 @@ class MainView(ft.Column):
 
         self.submit_button = ft.ElevatedButton("この内容で確定出力", visible=False, on_click=self._on_submit)
         self.snack = ft.SnackBar(ft.Text(""))
-        self.page.overlay.append(self.snack)
+        self._page.overlay.append(self.snack)
 
         super().__init__(
             controls=[
@@ -62,7 +62,7 @@ class MainView(ft.Column):
         self.selected_video = Path(e.files[0].path)
         self.path_text.value = f"選択中: {self.selected_video}"
         self.start_button.disabled = False
-        self.page.update()
+        self._page.update()
 
     def _on_start(self, _: ft.ControlEvent) -> None:
         if self.selected_video is None:
@@ -76,34 +76,34 @@ class MainView(ft.Column):
         self.result_view.summary.value = ""
         self.result_view.path_text.value = ""
         self.progress_view.set("ジョブ開始", 0.01)
-        self.page.update()
+        self._page.update()
 
         def worker() -> None:
             try:
                 result = self.orchestrator.run_pipeline(
                     self.selected_video,
-                    on_progress=lambda msg, p: self.page.call_from_thread(
+                    on_progress=lambda msg, p: self._page.call_from_thread(
                         self._update_progress, msg, p
                     ),
                 )
                 rows = self.orchestrator.get_review_rows(result.job.job_id)
                 self.current_job_id = result.job.job_id
-                self.page.call_from_thread(self._show_review_rows, rows)
+                self._page.call_from_thread(self._show_review_rows, rows)
             except Exception as exc:
                 self.logger.exception("ui.pipeline_failed", error=str(exc))
-                self.page.call_from_thread(self._on_error, str(exc))
+                self._page.call_from_thread(self._on_error, str(exc))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _update_progress(self, message: str, value: float) -> None:
         self.progress_view.set(message, value)
-        self.page.update()
+        self._page.update()
 
     def _show_review_rows(self, rows: list[dict]) -> None:
         self.review_view.load_rows(rows)
         self.submit_button.visible = True
         self.progress_view.set("最終チェックで採用可否・タイトルを確認してください", 1.0)
-        self.page.update()
+        self._page.update()
 
     def _on_submit(self, _: ft.ControlEvent) -> None:
         if not self.current_job_id:
@@ -118,7 +118,7 @@ class MainView(ft.Column):
         self.pick_button.disabled = False
         self.submit_button.visible = False
         self._toast("確定出力が完了しました")
-        self.page.update()
+        self._page.update()
 
     def _on_error(self, message: str) -> None:
         self.progress_view.set("失敗", 0.0)
@@ -126,9 +126,9 @@ class MainView(ft.Column):
         self.pick_button.disabled = False
         self.submit_button.visible = False
         self._toast(f"エラー: {message}")
-        self.page.update()
+        self._page.update()
 
     def _toast(self, text: str) -> None:
         self.snack.content = ft.Text(text)
         self.snack.open = True
-        self.page.update()
+        self._page.update()

@@ -96,7 +96,7 @@ def main() -> None:
         page.scroll = ft.ScrollMode.AUTO
         page.add(MainView(page=page, orchestrator=orchestrator, logger=get_logger()))
 
-    ft.app(target=_run)
+    ft.run(target=_run)
 
 
 if __name__ == "__main__":
