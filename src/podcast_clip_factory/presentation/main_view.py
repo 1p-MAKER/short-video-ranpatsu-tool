@@ -107,17 +107,15 @@ class MainView(ft.Column):
             try:
                 result = self.orchestrator.run_pipeline(
                     self.selected_video,
-                    on_progress=lambda msg, p: self._page.call_from_thread(
-                        self._update_progress, msg, p
-                    ),
-                    on_log=lambda line: self._page.call_from_thread(self._append_log, line),
+                    on_progress=lambda msg, p: self._dispatch_ui(self._update_progress, msg, p),
+                    on_log=lambda line: self._dispatch_ui(self._append_log, line),
                 )
                 rows = self.orchestrator.get_review_rows(result.job.job_id)
                 self.current_job_id = result.job.job_id
-                self._page.call_from_thread(self._show_review_rows, rows)
+                self._dispatch_ui(self._show_review_rows, rows)
             except Exception as exc:
                 self.logger.exception("ui.pipeline_failed", error=str(exc))
-                self._page.call_from_thread(self._on_error, str(exc))
+                self._dispatch_ui(self._on_error, str(exc))
 
         self._worker_thread = threading.Thread(target=worker, daemon=True)
         self._worker_thread.start()
@@ -187,7 +185,7 @@ class MainView(ft.Column):
 
         def heartbeat() -> None:
             while not self._heartbeat_stop.wait(1.0):
-                self._page.call_from_thread(self._refresh_runtime_status)
+                self._dispatch_ui(self._refresh_runtime_status)
 
         self._heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
         self._heartbeat_thread.start()
@@ -229,3 +227,13 @@ class MainView(ft.Column):
         mins = total_sec // 60
         secs = total_sec % 60
         return f"{mins:02d}:{secs:02d}"
+
+    def _dispatch_ui(self, callback, *args) -> None:
+        try:
+            self._page.run_task(self._run_ui_callback, callback, *args)
+        except Exception:
+            # Page closed or app shutting down.
+            return
+
+    async def _run_ui_callback(self, callback, *args) -> None:
+        callback(*args)
