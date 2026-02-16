@@ -105,7 +105,7 @@ def test_select_candidates_falls_back_to_secondary_analyzer():
         transcribe=TranscribeConfig("mlx", "faster", True, "m", "f"),
         llm=LLMConfig("gemini", "heuristic", 0, True, "g", "", ""),
         render=RenderConfig(1080, 1920, 1080, 608, 40, "h264_videotoolbox", "aac", "192k"),
-        subtitle=SubtitleConfig("Hiragino Sans", 52, "&H0039C1FF", "&H00FFFFFF", "&H00000000", 220),
+        subtitle=SubtitleConfig(False, "Hiragino Sans", 52, "&H0039C1FF", "&H00FFFFFF", "&H00000000", 220),
         root_dir=Path("."),
     )
 

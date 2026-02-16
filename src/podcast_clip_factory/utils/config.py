@@ -52,6 +52,7 @@ class RenderConfig:
 
 @dataclass(slots=True)
 class SubtitleConfig:
+    enable_subtitles: bool
     font_name: str
     font_size: int
     highlight_color: str
@@ -119,6 +120,7 @@ def load_settings(root_dir: Path) -> Settings:
             audio_bitrate=str(render["audio_bitrate"]),
         ),
         subtitle=SubtitleConfig(
+            enable_subtitles=bool(subtitle.get("enable_subtitles", False)),
             font_name=str(subtitle["font_name"]),
             font_size=int(subtitle["font_size"]),
             highlight_color=str(subtitle["highlight_color"]),

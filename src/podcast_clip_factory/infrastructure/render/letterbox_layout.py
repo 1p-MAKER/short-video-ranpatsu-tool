@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 def build_filtergraph(
-    subtitle_path: str,
+    subtitle_path: str | None,
     title_text: str,
     video_width: int,
     video_height: int,
@@ -16,7 +16,10 @@ def build_filtergraph(
         .replace("'", r"\\'")
         .replace("%", r"\\%")
     )
-    safe_sub_path = subtitle_path.replace("\\", r"\\").replace(":", r"\\:")
+    subtitle_filter = ""
+    if subtitle_path:
+        safe_sub_path = subtitle_path.replace("\\", r"\\").replace(":", r"\\:")
+        subtitle_filter = f",ass='{safe_sub_path}'"
 
     return (
         f"[0:v]scale={video_width}:{video_height}:force_original_aspect_ratio=increase,"
@@ -26,5 +29,5 @@ def build_filtergraph(
         f"[base]drawbox=x=0:y=0:w=iw:h=170:color=black@0.45:t=fill,"
         f"drawtext=font='Hiragino Sans':text='{safe_title}':"
         f"x=(w-text_w)/2:y=58:fontsize=56:fontcolor=white,"
-        f"ass='{safe_sub_path}'[v]"
+        f"{subtitle_filter}[v]"
     )

@@ -30,6 +30,7 @@ audio_codec = "aac"
 audio_bitrate = "192k"
 
 [subtitle]
+enable_subtitles = false
 font_name = "Hiragino Sans"
 font_size = 52
 highlight_color = "&H0039C1FF"

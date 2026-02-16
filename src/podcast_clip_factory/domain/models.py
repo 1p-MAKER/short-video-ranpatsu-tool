@@ -67,7 +67,7 @@ class RenderedClip:
     start_sec: float
     end_sec: float
     video_path: Path
-    subtitle_path: Path
+    subtitle_path: Path | None = None
 
 
 @dataclass(slots=True)

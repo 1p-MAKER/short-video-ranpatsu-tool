@@ -66,6 +66,7 @@ def build_orchestrator(root_dir: Path) -> AppOrchestrator:
         app_config=settings.app,
         command_builder=FFmpegCommandBuilder(settings.render),
         subtitle_generator=SubtitleGenerator(settings.subtitle),
+        enable_subtitles=settings.subtitle.enable_subtitles,
     )
 
     executor = PipelineExecutor(

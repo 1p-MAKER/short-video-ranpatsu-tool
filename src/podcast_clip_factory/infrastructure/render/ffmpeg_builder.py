@@ -15,13 +15,13 @@ class FFmpegCommandBuilder:
         self,
         input_video: Path,
         output_video: Path,
-        subtitle_path: Path,
+        subtitle_path: Path | None,
         candidate: ClipCandidate,
         fallback_software_codec: bool = False,
     ) -> list[str]:
         codec = "libx264" if fallback_software_codec else self.config.video_codec
         filter_graph = build_filtergraph(
-            subtitle_path=str(subtitle_path),
+            subtitle_path=str(subtitle_path) if subtitle_path else None,
             title_text=candidate.title,
             video_width=self.config.video_width,
             video_height=self.config.video_height,

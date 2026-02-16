@@ -125,7 +125,7 @@ class SQLiteJobRepository:
                 WHERE job_id = ? AND clip_id = ?
                 """,
                 [
-                    (str(r.video_path), str(r.subtitle_path), job_id, r.clip_id)
+                    (str(r.video_path), str(r.subtitle_path) if r.subtitle_path else "", job_id, r.clip_id)
                     for r in rendered
                 ],
             )

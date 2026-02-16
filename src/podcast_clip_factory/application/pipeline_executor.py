@@ -171,7 +171,7 @@ class PipelineExecutor:
                     {
                         "clip_id": r.clip_id,
                         "video_path": str(r.video_path),
-                        "subtitle_path": str(r.subtitle_path),
+                        "subtitle_path": str(r.subtitle_path) if r.subtitle_path else "",
                     }
                     for r in rendered
                 ],

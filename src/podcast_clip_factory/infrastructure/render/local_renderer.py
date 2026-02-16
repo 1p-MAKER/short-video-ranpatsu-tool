@@ -18,10 +18,12 @@ class LocalFFmpegRenderer:
         app_config: AppConfig,
         command_builder: FFmpegCommandBuilder,
         subtitle_generator: SubtitleGenerator,
+        enable_subtitles: bool = True,
     ) -> None:
         self.app_config = app_config
         self.command_builder = command_builder
         self.subtitle_generator = subtitle_generator
+        self.enable_subtitles = enable_subtitles
 
     def render(
         self,
@@ -32,9 +34,11 @@ class LocalFFmpegRenderer:
         on_event: Callable[[str, int, int, str], None] | None = None,
     ) -> list[RenderedClip]:
         clips_dir = output_dir / "clips"
-        subtitle_dir = output_dir / "subtitles"
         clips_dir.mkdir(parents=True, exist_ok=True)
-        subtitle_dir.mkdir(parents=True, exist_ok=True)
+        subtitle_dir: Path | None = None
+        if self.enable_subtitles:
+            subtitle_dir = output_dir / "subtitles"
+            subtitle_dir.mkdir(parents=True, exist_ok=True)
         total = len(candidates)
 
         with ThreadPoolExecutor(max_workers=self.app_config.render_parallelism) as executor:
@@ -67,21 +71,24 @@ class LocalFFmpegRenderer:
         candidate: ClipCandidate,
         input_video: Path,
         clips_dir: Path,
-        subtitle_dir: Path,
+        subtitle_dir: Path | None,
         transcript: Transcript,
         total: int,
         on_event: Callable[[str, int, int, str], None] | None,
     ) -> RenderedClip:
         safe_title = sanitize_filename(candidate.title)
         clip_filename = f"clip_{idx:02d}_{safe_title}.mp4"
-        subtitle_filename = f"clip_{idx:02d}.ass"
         output_path = clips_dir / clip_filename
-        subtitle_path = subtitle_dir / subtitle_filename
+        subtitle_path: Path | None = None
+        if self.enable_subtitles and subtitle_dir is not None:
+            subtitle_filename = f"clip_{idx:02d}.ass"
+            subtitle_path = subtitle_dir / subtitle_filename
 
         if on_event:
             on_event("started", idx, total, candidate.title)
 
-        self.subtitle_generator.generate(subtitle_path, candidate, transcript)
+        if subtitle_path is not None:
+            self.subtitle_generator.generate(subtitle_path, candidate, transcript)
         cmd = self.command_builder.build(input_video, output_path, subtitle_path, candidate)
 
         try:
