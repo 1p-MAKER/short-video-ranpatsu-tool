@@ -1,0 +1,4 @@
+[quality]
+fast_preset = "speed"
+default_crf = 20
+fallback_crf = 22

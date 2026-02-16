@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+
+# Virtual env
+.venv/
+venv/
+
+# Env
+.env
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Local artifacts
+runs/
+*.log
+
+# macOS
+.DS_Store

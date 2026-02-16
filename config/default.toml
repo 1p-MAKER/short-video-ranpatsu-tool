@@ -1,0 +1,38 @@
+[app]
+target_clips = 12
+min_clips = 10
+clip_min_sec = 30
+clip_max_sec = 60
+title_max_chars = 28
+render_parallelism = 3
+manual_start_only = true
+max_render_retries = 1
+
+[transcribe]
+primary = "mlx_whisper"
+fallback = "faster_whisper"
+word_timestamps = true
+
+[llm]
+primary = "gemini"
+fallback = "heuristic"
+max_retries = 3
+json_repair = true
+
+[render]
+video_width = 1080
+video_height = 1920
+center_width = 1080
+center_height = 608
+background_blur_sigma = 40
+video_codec = "h264_videotoolbox"
+audio_codec = "aac"
+audio_bitrate = "192k"
+
+[subtitle]
+font_name = "Hiragino Sans"
+font_size = 52
+highlight_color = "&H0039C1FF"
+primary_color = "&H00FFFFFF"
+outline_color = "&H00000000"
+bottom_margin = 220
