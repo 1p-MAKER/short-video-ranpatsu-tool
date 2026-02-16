@@ -229,6 +229,11 @@ class PipelineExecutor:
             return retry(primary_call, retries=self.settings.llm.max_retries, delay_sec=1.5)
         except Exception as llm_error:
             self.logger.warning("selector.primary_failed", error=str(llm_error))
+            if self.settings.llm.require_cloud:
+                raise RuntimeError(
+                    "Geminiによる候補抽出に失敗しました。"
+                    "現在の設定ではヒューリスティックへの自動フォールバックを禁止しています。"
+                ) from llm_error
             self._emit_log(on_log, f"Gemini失敗。ヒューリスティックに切替: {llm_error}")
             return self.fallback_analyzer.select_clips(
                 transcript=transcript,

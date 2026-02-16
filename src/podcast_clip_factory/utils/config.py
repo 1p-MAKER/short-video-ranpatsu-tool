@@ -31,6 +31,7 @@ class TranscribeConfig:
 class LLMConfig:
     primary: str
     fallback: str
+    require_cloud: bool
     max_retries: int
     json_repair: bool
     gemini_model: str
@@ -103,6 +104,7 @@ def load_settings(root_dir: Path) -> Settings:
         llm=LLMConfig(
             primary=str(llm["primary"]),
             fallback=str(llm["fallback"]),
+            require_cloud=bool(llm.get("require_cloud", True)),
             max_retries=int(llm["max_retries"]),
             json_repair=bool(llm["json_repair"]),
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),

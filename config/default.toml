@@ -16,6 +16,7 @@ word_timestamps = true
 [llm]
 primary = "gemini"
 fallback = "heuristic"
+require_cloud = true
 max_retries = 3
 json_repair = true
 

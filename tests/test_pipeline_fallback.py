@@ -103,7 +103,7 @@ def test_select_candidates_falls_back_to_secondary_analyzer():
     settings = Settings(
         app=AppConfig(12, 10, 30, 60, 28, 3, True, 1),
         transcribe=TranscribeConfig("mlx", "faster", True, "m", "f"),
-        llm=LLMConfig("gemini", "heuristic", 0, True, "g", "", ""),
+        llm=LLMConfig("gemini", "heuristic", False, 0, True, "g", "", ""),
         render=RenderConfig(1080, 1920, 1080, 608, 40, "h264_videotoolbox", "aac", "192k"),
         subtitle=SubtitleConfig(False, "Hiragino Sans", 52, "&H0039C1FF", "&H00FFFFFF", "&H00000000", 220),
         root_dir=Path("."),
