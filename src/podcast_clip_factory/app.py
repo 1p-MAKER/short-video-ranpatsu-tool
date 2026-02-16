@@ -3,7 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import flet as ft
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover
+    def load_dotenv(*_args, **_kwargs):
+        return False
 
 from podcast_clip_factory.application.orchestrator import AppOrchestrator
 from podcast_clip_factory.application.pipeline_executor import PipelineExecutor
