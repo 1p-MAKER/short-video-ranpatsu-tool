@@ -20,8 +20,8 @@ class MainView(ft.Column):
         self.selected_video: Path | None = None
         self.current_job_id: str | None = None
 
-        self.file_picker = ft.FilePicker(on_result=self._on_pick_result)
-        self._page.overlay.append(self.file_picker)
+        self.file_picker = ft.FilePicker()
+        self._page.services.append(self.file_picker)
 
         self.path_text = ft.Text("動画未選択", size=13)
         self.pick_button = ft.ElevatedButton("動画を選択", on_click=self._on_pick_clicked)
@@ -54,12 +54,10 @@ class MainView(ft.Column):
         )
 
     def _on_pick_clicked(self, _: ft.ControlEvent) -> None:
-        self.file_picker.pick_files(allow_multiple=False)
-
-    def _on_pick_result(self, e: ft.FilePickerResultEvent) -> None:
-        if not e.files:
+        files = self.file_picker.pick_files(allow_multiple=False)
+        if not files:
             return
-        self.selected_video = Path(e.files[0].path)
+        self.selected_video = Path(files[0].path)
         self.path_text.value = f"選択中: {self.selected_video}"
         self.start_button.disabled = False
         self._page.update()
