@@ -53,8 +53,8 @@ class MainView(ft.Column):
             scroll=ft.ScrollMode.AUTO,
         )
 
-    def _on_pick_clicked(self, _: ft.ControlEvent) -> None:
-        files = self.file_picker.pick_files(allow_multiple=False)
+    async def _on_pick_clicked(self, _: ft.ControlEvent) -> None:
+        files = await self.file_picker.pick_files(allow_multiple=False)
         if not files:
             return
         self.selected_video = Path(files[0].path)
