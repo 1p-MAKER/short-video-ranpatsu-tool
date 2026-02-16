@@ -106,13 +106,14 @@ class PipelineExecutor:
                 on_progress,
                 on_log,
             )
-            raw_candidates = self._run_with_heartbeat(
+            raw_candidates, selection_source = self._run_with_heartbeat(
                 operation=lambda: self._select_candidates(transcript, media_info, on_log=on_log),
                 phase_label="候補抽出",
                 base_progress=0.46,
                 on_progress=on_progress,
                 on_log=on_log,
             )
+            self._emit_log(on_log, f"候補抽出ソース: {selection_source}")
             final_candidates = self.rule_engine.finalize(raw_candidates, transcript)
             if len(final_candidates) < self.settings.app.min_clips:
                 raise RuntimeError(
@@ -155,6 +156,7 @@ class PipelineExecutor:
                     "height": media_info.height,
                     "fps": media_info.fps,
                 },
+                "selection_source": selection_source,
                 "candidates": [
                     {
                         "clip_id": c.clip_id,
@@ -226,7 +228,8 @@ class PipelineExecutor:
 
         try:
             self._emit_log(on_log, "候補抽出: Geminiを呼び出します")
-            return retry(primary_call, retries=self.settings.llm.max_retries, delay_sec=1.5)
+            candidates = retry(primary_call, retries=self.settings.llm.max_retries, delay_sec=1.5)
+            return candidates, "gemini"
         except Exception as llm_error:
             self.logger.warning("selector.primary_failed", error=str(llm_error))
             if self.settings.llm.require_cloud:
@@ -235,13 +238,14 @@ class PipelineExecutor:
                     "現在の設定ではヒューリスティックへの自動フォールバックを禁止しています。"
                 ) from llm_error
             self._emit_log(on_log, f"Gemini失敗。ヒューリスティックに切替: {llm_error}")
-            return self.fallback_analyzer.select_clips(
+            fallback_candidates = self.fallback_analyzer.select_clips(
                 transcript=transcript,
                 media_info=media_info,
                 target_count=self.settings.app.target_clips,
                 min_sec=self.settings.app.clip_min_sec,
                 max_sec=self.settings.app.clip_max_sec,
             )
+            return fallback_candidates, "heuristic"
 
     def _render_with_progress(
         self,

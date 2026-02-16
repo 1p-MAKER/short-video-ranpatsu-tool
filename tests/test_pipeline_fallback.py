@@ -124,5 +124,38 @@ def test_select_candidates_falls_back_to_secondary_analyzer():
 
     transcript = Transcript([TranscriptSegment(start=0, end=40, text="x")], duration_sec=40)
     media_info = MediaInfo(duration_sec=40, width=1920, height=1080, fps=30)
-    selected = executor._select_candidates(transcript, media_info)
+    selected, source = executor._select_candidates(transcript, media_info)
     assert selected[0].clip_id == "f1"
+    assert source == "heuristic"
+
+
+def test_select_candidates_raises_when_cloud_required():
+    settings = Settings(
+        app=AppConfig(12, 10, 30, 60, 28, 3, True, 1),
+        transcribe=TranscribeConfig("mlx", "faster", True, "m", "f"),
+        llm=LLMConfig("gemini", "heuristic", True, 0, True, "g", "", ""),
+        render=RenderConfig(1080, 1920, 1080, 608, 40, "h264_videotoolbox", "aac", "192k"),
+        subtitle=SubtitleConfig(False, "Hiragino Sans", 52, "&H0039C1FF", "&H00FFFFFF", "&H00000000", 220),
+        root_dir=Path("."),
+    )
+
+    executor = PipelineExecutor(
+        settings=settings,
+        repo=DummyRepo(),
+        store=DummyStore(),
+        primary_transcriber=DummyTranscriber(),
+        fallback_transcriber=DummyTranscriber(),
+        analyzer=FailingAnalyzer(),
+        fallback_analyzer=WorkingAnalyzer(),
+        rule_engine=ClipRuleEngine(ClipRuleConfig(12, 10, 30, 60, 28)),
+        renderer=DummyRenderer(),
+        logger=DummyLogger(),
+    )
+
+    transcript = Transcript([TranscriptSegment(start=0, end=40, text="x")], duration_sec=40)
+    media_info = MediaInfo(duration_sec=40, width=1920, height=1080, fps=30)
+    try:
+        executor._select_candidates(transcript, media_info)
+        assert False, "Expected RuntimeError"
+    except RuntimeError as exc:
+        assert "Geminiによる候補抽出に失敗" in str(exc)

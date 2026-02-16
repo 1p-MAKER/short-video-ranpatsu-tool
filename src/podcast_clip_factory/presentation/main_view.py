@@ -93,8 +93,11 @@ class MainView(ft.Column):
         self._page.update()
 
     def _on_start(self, _: ft.ControlEvent) -> None:
-        if self.selected_video is None:
-            self._toast("動画を選択してください")
+        preflight_errors = self.orchestrator.preflight(self.selected_video)
+        if preflight_errors:
+            self._toast(preflight_errors[0])
+            for err in preflight_errors:
+                self._append_log(f"開始前チェック失敗: {err}")
             return
 
         self.start_button.disabled = True

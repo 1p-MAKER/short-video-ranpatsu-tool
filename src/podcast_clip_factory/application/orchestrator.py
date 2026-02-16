@@ -19,6 +19,17 @@ class AppOrchestrator:
     def run_pipeline(self, input_video: Path, on_progress=None, on_log=None):
         return self.executor.run(input_video=input_video, on_progress=on_progress, on_log=on_log)
 
+    def preflight(self, input_video: Path | None) -> list[str]:
+        errors: list[str] = []
+        if input_video is None:
+            errors.append("入力動画が未選択です。")
+        elif not input_video.exists():
+            errors.append(f"入力動画が見つかりません: {input_video}")
+
+        if self.executor.settings.llm.require_cloud and not self.executor.settings.llm.gemini_api_key.strip():
+            errors.append("GEMINI_API_KEY が未設定です。`.env` に設定してください。")
+        return errors
+
     def get_review_rows(self, job_id: str) -> list[dict]:
         return self.repo.get_review_rows(job_id)
 
