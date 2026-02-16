@@ -84,7 +84,7 @@ def main() -> None:
     orchestrator = build_orchestrator(root_dir)
 
     def _run(page: ft.Page) -> None:
-        page.title = "Podcast Clip Factory"
+        page.title = "ショート動画乱発ツール"
         page.window.width = 1180
         page.window.height = 900
         page.padding = 16

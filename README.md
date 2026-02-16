@@ -1,6 +1,6 @@
-# Podcast Clip Factory
+# ショート動画乱発ツール
 
-Mac mini (Apple Silicon) 向けの「ポッドキャスト切り抜き自動化ファクトリー」実装です。
+Mac mini (Apple Silicon) 向けの「ショート動画乱発ツール」実装です。
 
 ## 仕様ハイライト
 - 30〜50分の横長動画から 9:16 ショートを自動生成

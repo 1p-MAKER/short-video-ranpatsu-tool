@@ -3,13 +3,13 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "podcast-clip-factory"
+name = "short-video-ranpatsu-tool"
 version = "0.1.0"
 description = "Desktop app to auto-generate podcast short clips"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "Podcast Clip Factory" }]
+authors = [{ name = "ショート動画乱発ツール" }]
 dependencies = [
   "flet>=0.28.0",
   "pydantic>=2.6.0",

@@ -37,7 +37,7 @@ class MainView(ft.Column):
 
         super().__init__(
             controls=[
-                ft.Text("ポッドキャスト切り抜き自動化ファクトリー", size=24, weight=ft.FontWeight.BOLD),
+                ft.Text("ショート動画乱発ツール", size=24, weight=ft.FontWeight.BOLD),
                 ft.Text("開始から最終チェック手前まで全自動。最後だけ手動確認。", size=13),
                 ft.Row([self.pick_button, self.start_button], spacing=10),
                 self.path_text,
