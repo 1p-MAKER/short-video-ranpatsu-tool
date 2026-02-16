@@ -75,6 +75,7 @@ class PipelineExecutor:
                 on_log,
                 f"想定所要時間: {self._estimate_total_minutes(media_info.duration_sec):.1f}分前後",
             )
+            self._ensure_cloud_available(on_log=on_log)
             extract_audio(input_video, audio_path)
             self._emit_log(on_log, "音声抽出が完了しました")
 
@@ -372,3 +373,13 @@ class PipelineExecutor:
         if on_progress:
             on_progress(message, progress)
         self._emit_log(on_log, message)
+
+    def _ensure_cloud_available(self, on_log: LogCallback | None = None) -> None:
+        if not self.settings.llm.require_cloud:
+            return
+        checker = getattr(self.analyzer, "check_availability", None)
+        if not callable(checker):
+            return
+        self._emit_log(on_log, "クラウド接続チェック: Gemini")
+        checker()
+        self._emit_log(on_log, "クラウド接続チェック: OK")

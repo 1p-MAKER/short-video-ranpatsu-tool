@@ -49,6 +49,7 @@ def build_orchestrator(root_dir: Path) -> AppOrchestrator:
         api_key=settings.llm.gemini_api_key,
         model=settings.llm.gemini_model,
         prompt_path=root_dir / "prompts" / "clip_selector.md",
+        json_repair=settings.llm.json_repair,
     )
     heuristic_analyzer = HeuristicClipAnalyzer()
 
