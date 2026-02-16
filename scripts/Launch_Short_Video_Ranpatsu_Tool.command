@@ -22,6 +22,15 @@ if ! "$PYTHON_BIN" -c "import flet" >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! "$PYTHON_BIN" -c "import mlx_whisper" >/dev/null 2>&1; then
+  echo "警告: mlx-whisper が未インストールです。"
+  echo "文字起こしは slower fallback（faster-whisper/CPU）になり、非常に時間がかかる場合があります。"
+  echo "推奨:"
+  echo "  cd '$PROJECT_DIR'"
+  echo "  pip install -e .[transcribe]"
+  echo
+fi
+
 PYTHONPATH="$PROJECT_DIR/src:${PYTHONPATH:-}" "$PYTHON_BIN" -m podcast_clip_factory.app || {
   echo
   echo "起動に失敗しました。ログを確認してください。"
