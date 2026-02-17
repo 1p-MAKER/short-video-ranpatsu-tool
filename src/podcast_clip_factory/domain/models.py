@@ -88,6 +88,16 @@ class TitleOverlayStyle:
 
 
 @dataclass(slots=True)
+class ImpactOverlayStyle:
+    font_name: str = "Hiragino Sans W6"
+    font_size: int = 48
+    y: int = 1480
+    background: bool = True
+    background_opacity: float = 0.55
+    background_padding: int = 16
+
+
+@dataclass(slots=True)
 class MediaInfo:
     duration_sec: float
     width: int

@@ -163,6 +163,8 @@ class MainView(ft.Column):
 
         decisions: list[ReviewDecision] = self.review_view.collect_decisions()
         title_style = self.review_view.collect_title_style()
+        impact_style = self.review_view.collect_impact_style()
+        impact_texts = self.review_view.collect_impact_phrases()
         self.submit_button.disabled = True
         self.start_button.disabled = True
         self.pick_button.disabled = True
@@ -177,6 +179,8 @@ class MainView(ft.Column):
                     self.current_job_id,
                     decisions,
                     title_style=title_style,
+                    impact_style=impact_style,
+                    impact_texts=impact_texts,
                     on_log=lambda line: self._dispatch_ui(self._append_log, line),
                 )
                 self._dispatch_ui(self._on_submit_success, payload)

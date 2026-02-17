@@ -3,7 +3,14 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from podcast_clip_factory.domain.models import ClipCandidate, JobStatus, ReviewDecision, TitleOverlayStyle, Transcript
+from podcast_clip_factory.domain.models import (
+    ClipCandidate,
+    ImpactOverlayStyle,
+    JobStatus,
+    ReviewDecision,
+    TitleOverlayStyle,
+    Transcript,
+)
 from podcast_clip_factory.infrastructure.storage.artifact_store import ArtifactStore
 from podcast_clip_factory.infrastructure.storage.sqlite_repo import SQLiteJobRepository
 from podcast_clip_factory.utils.paths import sanitize_filename
@@ -38,6 +45,8 @@ class AppOrchestrator:
         job_id: str,
         decisions: list[ReviewDecision],
         title_style: TitleOverlayStyle | None = None,
+        impact_style: ImpactOverlayStyle | None = None,
+        impact_texts: dict[str, str] | None = None,
         on_log=None,
     ) -> dict:
         self.repo.save_review_decisions(job_id, decisions)
@@ -63,6 +72,7 @@ class AppOrchestrator:
                     hook="",
                     reason="review_finalize",
                     score=float(row["score"]),
+                    punchline=(impact_texts or {}).get(str(row["clip_id"]), "").strip()[:40],
                 )
                 for row in selected_rows
             ]
@@ -89,6 +99,7 @@ class AppOrchestrator:
                 candidates=candidates,
                 transcript=transcript,
                 title_style=title_style,
+                impact_style=impact_style,
                 on_event=_on_render_event,
             )
 
@@ -118,6 +129,12 @@ class AppOrchestrator:
                 "font_size": title_style.font_size if title_style else 56,
                 "y": title_style.y if title_style else 58,
                 "background": title_style.background if title_style else True,
+            },
+            "impact_style": {
+                "font_name": impact_style.font_name if impact_style else "Hiragino Sans W6",
+                "font_size": impact_style.font_size if impact_style else 48,
+                "y": impact_style.y if impact_style else 1480,
+                "background": impact_style.background if impact_style else True,
             },
         }
         self.store.write_json(self.store.final_metadata_path(job_id), payload)

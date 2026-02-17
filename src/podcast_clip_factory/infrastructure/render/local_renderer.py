@@ -4,7 +4,13 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from podcast_clip_factory.domain.models import ClipCandidate, RenderedClip, TitleOverlayStyle, Transcript
+from podcast_clip_factory.domain.models import (
+    ClipCandidate,
+    ImpactOverlayStyle,
+    RenderedClip,
+    TitleOverlayStyle,
+    Transcript,
+)
 from podcast_clip_factory.infrastructure.render.ffmpeg_builder import FFmpegCommandBuilder
 from podcast_clip_factory.infrastructure.render.subtitle_generator import SubtitleGenerator
 from podcast_clip_factory.utils.config import AppConfig
@@ -32,6 +38,7 @@ class LocalFFmpegRenderer:
         candidates: list[ClipCandidate],
         transcript: Transcript,
         title_style: TitleOverlayStyle | None = None,
+        impact_style: ImpactOverlayStyle | None = None,
         on_event: Callable[[str, int, int, str], None] | None = None,
     ) -> list[RenderedClip]:
         clips_dir = output_dir / "clips"
@@ -53,6 +60,7 @@ class LocalFFmpegRenderer:
                     subtitle_dir,
                     transcript,
                     title_style,
+                    impact_style,
                     total,
                     on_event,
                 ): idx
@@ -76,6 +84,7 @@ class LocalFFmpegRenderer:
         subtitle_dir: Path | None,
         transcript: Transcript,
         title_style: TitleOverlayStyle | None,
+        impact_style: ImpactOverlayStyle | None,
         total: int,
         on_event: Callable[[str, int, int, str], None] | None,
     ) -> RenderedClip:
@@ -98,6 +107,7 @@ class LocalFFmpegRenderer:
             subtitle_path=subtitle_path,
             candidate=candidate,
             title_style=title_style,
+            impact_style=impact_style,
         )
 
         try:
@@ -110,6 +120,7 @@ class LocalFFmpegRenderer:
                     subtitle_path=subtitle_path,
                     candidate=candidate,
                     title_style=title_style,
+                    impact_style=impact_style,
                     fallback_software_codec=True,
                 )
                 run_command(fallback)
