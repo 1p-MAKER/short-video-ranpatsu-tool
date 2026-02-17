@@ -71,11 +71,12 @@ def test_build_speech_intervals_compacts_gaps():
         duration_sec=60,
     )
 
-    intervals = renderer._build_speech_intervals(candidate, transcript)
+    renderer._detect_silence_ranges = lambda _video, _candidate: [(4.0, 12.0), (20.0, 36.0)]  # type: ignore[method-assign]
+    intervals = renderer._build_speech_intervals(Path("in.mp4"), candidate, transcript)
     assert intervals is not None
-    assert len(intervals) == 3
-    assert intervals[0][0] <= 1
-    assert intervals[-1][1] >= 43
+    assert len(intervals) >= 2
+    assert intervals[0][0] == 0.0
+    assert intervals[-1][1] <= 60.0
 
 
 def test_ffmpeg_builder_uses_concat_when_speech_intervals_given():

@@ -14,6 +14,8 @@ silence_merge_gap_sec = 0.25
 silence_min_segment_sec = 0.18
 silence_min_cut_total_sec = 0.8
 silence_max_segments = 24
+silence_detect_noise_db = -35
+silence_detect_min_sec = 0.35
 
 [transcribe]
 primary = "mlx_whisper"

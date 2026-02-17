@@ -23,6 +23,8 @@ class AppConfig:
     silence_min_segment_sec: float = 0.18
     silence_min_cut_total_sec: float = 0.8
     silence_max_segments: int = 24
+    silence_detect_noise_db: float = -35.0
+    silence_detect_min_sec: float = 0.35
 
 
 @dataclass(slots=True)
@@ -109,6 +111,8 @@ def load_settings(root_dir: Path) -> Settings:
             silence_min_segment_sec=float(app.get("silence_min_segment_sec", 0.18)),
             silence_min_cut_total_sec=float(app.get("silence_min_cut_total_sec", 0.8)),
             silence_max_segments=max(1, int(app.get("silence_max_segments", 24))),
+            silence_detect_noise_db=float(app.get("silence_detect_noise_db", -35.0)),
+            silence_detect_min_sec=float(app.get("silence_detect_min_sec", 0.35)),
         ),
         transcribe=TranscribeConfig(
             primary=str(trans["primary"]),

@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+import re
+import subprocess
 
 from podcast_clip_factory.domain.models import (
     ClipCandidate,
@@ -10,7 +12,6 @@ from podcast_clip_factory.domain.models import (
     RenderedClip,
     TitleOverlayStyle,
     Transcript,
-    TranscriptSegment,
 )
 from podcast_clip_factory.infrastructure.render.ffmpeg_builder import FFmpegCommandBuilder
 from podcast_clip_factory.infrastructure.render.subtitle_generator import SubtitleGenerator
@@ -110,7 +111,7 @@ class LocalFFmpegRenderer:
             title_style=title_style,
             impact_style=impact_style,
             speech_intervals=(
-                self._build_speech_intervals(candidate, transcript)
+                self._build_speech_intervals(input_video, candidate, transcript)
                 if self.app_config.enable_silence_compaction
                 else None
             ),
@@ -128,7 +129,7 @@ class LocalFFmpegRenderer:
                     title_style=title_style,
                     impact_style=impact_style,
                     speech_intervals=(
-                        self._build_speech_intervals(candidate, transcript)
+                        self._build_speech_intervals(input_video, candidate, transcript)
                         if self.app_config.enable_silence_compaction
                         else None
                     ),
@@ -154,12 +155,12 @@ class LocalFFmpegRenderer:
 
     def _build_speech_intervals(
         self,
+        input_video: Path,
         candidate: ClipCandidate,
         transcript: Transcript,
     ) -> list[tuple[float, float]] | None:
-        clip_start = float(candidate.start_sec)
-        clip_end = float(candidate.end_sec)
-        if clip_end <= clip_start:
+        duration = max(0.0, float(candidate.end_sec - candidate.start_sec))
+        if duration <= 0:
             return None
 
         pad = max(0.0, float(self.app_config.silence_speech_pad_sec))
@@ -168,44 +169,117 @@ class LocalFFmpegRenderer:
         min_cut_total = max(0.0, float(self.app_config.silence_min_cut_total_sec))
         max_segments = max(1, int(self.app_config.silence_max_segments))
 
-        overlaps: list[tuple[float, float]] = []
-        for seg in transcript.segments:
-            interval = self._to_local_interval(seg, clip_start, clip_end, pad, min_seg)
-            if interval:
-                overlaps.append(interval)
+        silences = self._detect_silence_ranges(input_video, candidate)
+        if silences:
+            speech = self._invert_intervals(silences, duration)
+        else:
+            speech = self._build_from_transcript_fallback(candidate, transcript, pad, min_seg)
 
-        if len(overlaps) < 2:
+        if len(speech) < 2:
             return None
 
-        merged = self._merge_intervals(overlaps, merge_gap)
+        padded = [
+            (max(0.0, start - pad), min(duration, end + pad))
+            for start, end in speech
+            if end - start >= min_seg
+        ]
+        merged = self._merge_intervals(padded, merge_gap)
         if len(merged) < 2:
             return None
 
         if len(merged) > max_segments:
             merged = self._reduce_intervals(merged, max_segments)
 
-        original = clip_end - clip_start
+        original = duration
         kept = sum(max(0.0, end - start) for start, end in merged)
         if original - kept < min_cut_total:
             return None
 
         return merged
 
-    def _to_local_interval(
+    def _detect_silence_ranges(self, input_video: Path, candidate: ClipCandidate) -> list[tuple[float, float]]:
+        duration = max(0.0, float(candidate.end_sec - candidate.start_sec))
+        if duration <= 0:
+            return []
+
+        noise_db = float(self.app_config.silence_detect_noise_db)
+        min_silence = max(0.05, float(self.app_config.silence_detect_min_sec))
+        cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-ss",
+            f"{candidate.start_sec:.3f}",
+            "-to",
+            f"{candidate.end_sec:.3f}",
+            "-i",
+            str(input_video),
+            "-vn",
+            "-af",
+            f"silencedetect=noise={noise_db:.1f}dB:d={min_silence:.2f}",
+            "-f",
+            "null",
+            "-",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            return []
+
+        text = (proc.stderr or "") + "\n" + (proc.stdout or "")
+        silences: list[tuple[float, float]] = []
+        current_start: float | None = None
+        for line in text.splitlines():
+            start_match = re.search(r"silence_start:\s*([0-9.]+)", line)
+            if start_match:
+                current_start = max(0.0, float(start_match.group(1)))
+                continue
+            end_match = re.search(r"silence_end:\s*([0-9.]+)", line)
+            if end_match and current_start is not None:
+                end_val = min(duration, float(end_match.group(1)))
+                if end_val > current_start:
+                    silences.append((current_start, end_val))
+                current_start = None
+        if current_start is not None and current_start < duration:
+            silences.append((current_start, duration))
+        return self._merge_intervals(silences, 0.03)
+
+    def _invert_intervals(
         self,
-        seg: TranscriptSegment,
-        clip_start: float,
-        clip_end: float,
-        pad: float,
+        silences: list[tuple[float, float]],
+        duration: float,
+    ) -> list[tuple[float, float]]:
+        if duration <= 0:
+            return []
+        result: list[tuple[float, float]] = []
+        cursor = 0.0
+        for start, end in sorted(silences, key=lambda x: x[0]):
+            start = max(0.0, min(duration, start))
+            end = max(0.0, min(duration, end))
+            if start > cursor:
+                result.append((cursor, start))
+            cursor = max(cursor, end)
+        if cursor < duration:
+            result.append((cursor, duration))
+        return result
+
+    def _build_from_transcript_fallback(
+        self,
+        candidate: ClipCandidate,
+        transcript: Transcript,
+        _pad: float,
         min_seg: float,
-    ) -> tuple[float, float] | None:
-        if seg.end <= clip_start or seg.start >= clip_end:
-            return None
-        start = max(0.0, seg.start - clip_start - pad)
-        end = min(clip_end - clip_start, seg.end - clip_start + pad)
-        if end - start < min_seg:
-            return None
-        return (start, end)
+    ) -> list[tuple[float, float]]:
+        clip_start = float(candidate.start_sec)
+        clip_end = float(candidate.end_sec)
+        overlaps: list[tuple[float, float]] = []
+        for seg in transcript.segments:
+            if seg.end <= clip_start or seg.start >= clip_end:
+                continue
+            start = max(0.0, seg.start - clip_start)
+            end = min(clip_end - clip_start, seg.end - clip_start)
+            if end - start >= min_seg:
+                overlaps.append((start, end))
+        return overlaps
 
     def _merge_intervals(
         self,
