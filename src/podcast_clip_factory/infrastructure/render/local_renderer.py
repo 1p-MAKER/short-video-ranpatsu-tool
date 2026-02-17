@@ -101,8 +101,19 @@ class LocalFFmpegRenderer:
         if on_event:
             on_event("started", idx, total, candidate.title)
 
+        speech_intervals = (
+            self._build_speech_intervals(input_video, candidate, transcript)
+            if self.app_config.enable_silence_compaction
+            else None
+        )
+
         if subtitle_path is not None:
-            self.subtitle_generator.generate(subtitle_path, candidate, transcript)
+            self.subtitle_generator.generate(
+                subtitle_path,
+                candidate,
+                transcript,
+                speech_intervals=speech_intervals,
+            )
         cmd = self.command_builder.build(
             input_video=input_video,
             output_video=output_path,
@@ -110,11 +121,7 @@ class LocalFFmpegRenderer:
             candidate=candidate,
             title_style=title_style,
             impact_style=impact_style,
-            speech_intervals=(
-                self._build_speech_intervals(input_video, candidate, transcript)
-                if self.app_config.enable_silence_compaction
-                else None
-            ),
+            speech_intervals=speech_intervals,
         )
 
         try:
@@ -128,11 +135,7 @@ class LocalFFmpegRenderer:
                     candidate=candidate,
                     title_style=title_style,
                     impact_style=impact_style,
-                    speech_intervals=(
-                        self._build_speech_intervals(input_video, candidate, transcript)
-                        if self.app_config.enable_silence_compaction
-                        else None
-                    ),
+                    speech_intervals=speech_intervals,
                     fallback_software_codec=True,
                 )
                 run_command(fallback)

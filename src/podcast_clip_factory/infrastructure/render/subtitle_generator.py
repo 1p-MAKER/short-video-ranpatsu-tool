@@ -10,13 +10,24 @@ class SubtitleGenerator:
     def __init__(self, config: SubtitleConfig) -> None:
         self.config = config
 
-    def generate(self, path: Path, candidate: ClipCandidate, transcript: Transcript) -> Path:
-        lines = self._build_dialogue_lines(candidate, transcript)
+    def generate(
+        self,
+        path: Path,
+        candidate: ClipCandidate,
+        transcript: Transcript,
+        speech_intervals: list[tuple[float, float]] | None = None,
+    ) -> Path:
+        lines = self._build_dialogue_lines(candidate, transcript, speech_intervals=speech_intervals)
         content = self._render_ass(lines)
         path.write_text(content, encoding="utf-8")
         return path
 
-    def _build_dialogue_lines(self, candidate: ClipCandidate, transcript: Transcript) -> list[tuple[float, float, str]]:
+    def _build_dialogue_lines(
+        self,
+        candidate: ClipCandidate,
+        transcript: Transcript,
+        speech_intervals: list[tuple[float, float]] | None = None,
+    ) -> list[tuple[float, float, str]]:
         start = candidate.start_sec
         end = candidate.end_sec
         lines: list[tuple[float, float, str]] = []
@@ -29,9 +40,35 @@ class SubtitleGenerator:
             if rel_end <= rel_start:
                 continue
             text = self._sanitize_text(seg.text)
-            lines.append((rel_start, rel_end, text))
+            if speech_intervals:
+                mapped = self._map_to_compacted_timeline(rel_start, rel_end, speech_intervals)
+                for mapped_start, mapped_end in mapped:
+                    if mapped_end > mapped_start:
+                        lines.append((mapped_start, mapped_end, text))
+            else:
+                lines.append((rel_start, rel_end, text))
 
         return lines
+
+    def _map_to_compacted_timeline(
+        self,
+        seg_start: float,
+        seg_end: float,
+        speech_intervals: list[tuple[float, float]],
+    ) -> list[tuple[float, float]]:
+        mapped: list[tuple[float, float]] = []
+        out_cursor = 0.0
+        for keep_start, keep_end in speech_intervals:
+            if keep_end <= keep_start:
+                continue
+            overlap_start = max(seg_start, keep_start)
+            overlap_end = min(seg_end, keep_end)
+            if overlap_end > overlap_start:
+                mapped_start = out_cursor + (overlap_start - keep_start)
+                mapped_end = out_cursor + (overlap_end - keep_start)
+                mapped.append((mapped_start, mapped_end))
+            out_cursor += keep_end - keep_start
+        return mapped
 
     def _render_ass(self, lines: list[tuple[float, float, str]]) -> str:
         header = f"""[Script Info]
