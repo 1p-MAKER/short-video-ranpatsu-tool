@@ -10,6 +10,7 @@ from podcast_clip_factory.domain.models import (
     RenderedClip,
     TitleOverlayStyle,
     Transcript,
+    TranscriptSegment,
 )
 from podcast_clip_factory.infrastructure.render.ffmpeg_builder import FFmpegCommandBuilder
 from podcast_clip_factory.infrastructure.render.subtitle_generator import SubtitleGenerator
@@ -108,6 +109,11 @@ class LocalFFmpegRenderer:
             candidate=candidate,
             title_style=title_style,
             impact_style=impact_style,
+            speech_intervals=(
+                self._build_speech_intervals(candidate, transcript)
+                if self.app_config.enable_silence_compaction
+                else None
+            ),
         )
 
         try:
@@ -121,6 +127,11 @@ class LocalFFmpegRenderer:
                     candidate=candidate,
                     title_style=title_style,
                     impact_style=impact_style,
+                    speech_intervals=(
+                        self._build_speech_intervals(candidate, transcript)
+                        if self.app_config.enable_silence_compaction
+                        else None
+                    ),
                     fallback_software_codec=True,
                 )
                 run_command(fallback)
@@ -140,3 +151,94 @@ class LocalFFmpegRenderer:
             video_path=output_path,
             subtitle_path=subtitle_path,
         )
+
+    def _build_speech_intervals(
+        self,
+        candidate: ClipCandidate,
+        transcript: Transcript,
+    ) -> list[tuple[float, float]] | None:
+        clip_start = float(candidate.start_sec)
+        clip_end = float(candidate.end_sec)
+        if clip_end <= clip_start:
+            return None
+
+        pad = max(0.0, float(self.app_config.silence_speech_pad_sec))
+        merge_gap = max(0.0, float(self.app_config.silence_merge_gap_sec))
+        min_seg = max(0.05, float(self.app_config.silence_min_segment_sec))
+        min_cut_total = max(0.0, float(self.app_config.silence_min_cut_total_sec))
+        max_segments = max(1, int(self.app_config.silence_max_segments))
+
+        overlaps: list[tuple[float, float]] = []
+        for seg in transcript.segments:
+            interval = self._to_local_interval(seg, clip_start, clip_end, pad, min_seg)
+            if interval:
+                overlaps.append(interval)
+
+        if len(overlaps) < 2:
+            return None
+
+        merged = self._merge_intervals(overlaps, merge_gap)
+        if len(merged) < 2:
+            return None
+
+        if len(merged) > max_segments:
+            merged = self._reduce_intervals(merged, max_segments)
+
+        original = clip_end - clip_start
+        kept = sum(max(0.0, end - start) for start, end in merged)
+        if original - kept < min_cut_total:
+            return None
+
+        return merged
+
+    def _to_local_interval(
+        self,
+        seg: TranscriptSegment,
+        clip_start: float,
+        clip_end: float,
+        pad: float,
+        min_seg: float,
+    ) -> tuple[float, float] | None:
+        if seg.end <= clip_start or seg.start >= clip_end:
+            return None
+        start = max(0.0, seg.start - clip_start - pad)
+        end = min(clip_end - clip_start, seg.end - clip_start + pad)
+        if end - start < min_seg:
+            return None
+        return (start, end)
+
+    def _merge_intervals(
+        self,
+        intervals: list[tuple[float, float]],
+        merge_gap: float,
+    ) -> list[tuple[float, float]]:
+        if not intervals:
+            return []
+        ordered = sorted(intervals, key=lambda x: x[0])
+        merged: list[tuple[float, float]] = [ordered[0]]
+        for start, end in ordered[1:]:
+            last_start, last_end = merged[-1]
+            if start - last_end <= merge_gap:
+                merged[-1] = (last_start, max(last_end, end))
+            else:
+                merged.append((start, end))
+        return merged
+
+    def _reduce_intervals(
+        self,
+        intervals: list[tuple[float, float]],
+        max_segments: int,
+    ) -> list[tuple[float, float]]:
+        merged = intervals[:]
+        while len(merged) > max_segments:
+            best_i = 0
+            best_gap = float("inf")
+            for i in range(len(merged) - 1):
+                gap = merged[i + 1][0] - merged[i][1]
+                if gap < best_gap:
+                    best_gap = gap
+                    best_i = i
+            left = merged[best_i]
+            right = merged[best_i + 1]
+            merged[best_i : best_i + 2] = [(left[0], right[1])]
+        return merged

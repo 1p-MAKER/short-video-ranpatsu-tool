@@ -17,6 +17,12 @@ class AppConfig:
     manual_start_only: bool
     max_render_retries: int
     default_media_dir: str = "/Volumes/1peiHDD_2TB/DaVinciResolve_material_HDD/RADIO"
+    enable_silence_compaction: bool = True
+    silence_speech_pad_sec: float = 0.12
+    silence_merge_gap_sec: float = 0.25
+    silence_min_segment_sec: float = 0.18
+    silence_min_cut_total_sec: float = 0.8
+    silence_max_segments: int = 24
 
 
 @dataclass(slots=True)
@@ -97,6 +103,12 @@ def load_settings(root_dir: Path) -> Settings:
             default_media_dir=str(
                 app.get("default_media_dir", "/Volumes/1peiHDD_2TB/DaVinciResolve_material_HDD/RADIO")
             ),
+            enable_silence_compaction=bool(app.get("enable_silence_compaction", True)),
+            silence_speech_pad_sec=float(app.get("silence_speech_pad_sec", 0.12)),
+            silence_merge_gap_sec=float(app.get("silence_merge_gap_sec", 0.25)),
+            silence_min_segment_sec=float(app.get("silence_min_segment_sec", 0.18)),
+            silence_min_cut_total_sec=float(app.get("silence_min_cut_total_sec", 0.8)),
+            silence_max_segments=max(1, int(app.get("silence_max_segments", 24))),
         ),
         transcribe=TranscribeConfig(
             primary=str(trans["primary"]),

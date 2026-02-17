@@ -8,6 +8,12 @@ render_parallelism = 3
 manual_start_only = true
 max_render_retries = 1
 default_media_dir = "/Volumes/1peiHDD_2TB/DaVinciResolve_material_HDD/RADIO"
+enable_silence_compaction = true
+silence_speech_pad_sec = 0.12
+silence_merge_gap_sec = 0.25
+silence_min_segment_sec = 0.18
+silence_min_cut_total_sec = 0.8
+silence_max_segments = 24
 
 [transcribe]
 primary = "mlx_whisper"

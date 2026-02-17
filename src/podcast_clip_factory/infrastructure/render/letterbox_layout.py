@@ -22,6 +22,7 @@ def build_filtergraph(
     impact_background: bool,
     impact_background_opacity: float,
     impact_background_padding: int,
+    video_input_label: str = "0:v",
 ) -> str:
     safe_title = (
         title_text.replace("\\", r"\\")
@@ -70,9 +71,9 @@ def build_filtergraph(
         )
 
     return (
-        f"[0:v]scale={video_width}:{video_height}:force_original_aspect_ratio=increase,"
+        f"[{video_input_label}]scale={video_width}:{video_height}:force_original_aspect_ratio=increase,"
         f"crop={video_width}:{video_height},gblur=sigma={blur_sigma}[bg];"
-        f"[0:v]scale={center_width}:{center_height}:force_original_aspect_ratio=decrease[fg];"
+        f"[{video_input_label}]scale={center_width}:{center_height}:force_original_aspect_ratio=decrease[fg];"
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base];"
         f"[base]drawtext=font='{safe_font_name}':text='{safe_title}':"
         f"x=(w-text_w)/2:y={int(title_y)}:fontsize={int(font_size)}:fontcolor=white{text_bg_opts}"
