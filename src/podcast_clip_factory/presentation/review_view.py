@@ -11,13 +11,13 @@ class ReviewView(ft.Column):
         self._controls: list[tuple[str, ft.Checkbox, ft.TextField, ft.TextField]] = []
         self.font_size_slider = ft.Slider(min=24, max=140, value=56, label="{value}")
         self.y_slider = ft.Slider(min=-5000, max=5000, value=58, label="{value}")
-        self.y_value_text = ft.Text("58", size=12, color=ft.Colors.BLUE_GREY_600)
+        self.y_value_text = ft.Text("58", size=11, color=ft.Colors.BLUE_GREY_600)
         self.bg_checkbox = ft.Checkbox(label="タイトル背景を表示", value=True)
         self.impact_font_size_slider = ft.Slider(min=20, max=120, value=48, label="{value}")
         self.impact_y_slider = ft.Slider(min=-5000, max=5000, value=1480, label="{value}")
-        self.impact_y_value_text = ft.Text("1480", size=12, color=ft.Colors.BLUE_GREY_600)
+        self.impact_y_value_text = ft.Text("1480", size=11, color=ft.Colors.BLUE_GREY_600)
         self.impact_bg_checkbox = ft.Checkbox(label="一言背景を表示", value=True)
-        self.preview_scale = 0.18  # 1080x1920 -> 194x346 preview
+        self.preview_scale = 0.24  # 1080x1920 -> 259x460 preview
         self.preview_width = int(1080 * self.preview_scale)
         self.preview_height = int(1920 * self.preview_scale)
         self.preview_title_text = ft.Text(
@@ -72,12 +72,12 @@ class ReviewView(ft.Column):
         )
         self.font_size_slider.on_change = self._on_style_change
         self.y_slider.on_change = self._on_style_change
-        self.y_slider.width = 220
+        self.y_slider.width = 170
         self.y_slider.rotate = ft.Rotate(angle=-1.5708)
         self.bg_checkbox.on_change = self._on_style_change
         self.impact_font_size_slider.on_change = self._on_style_change
         self.impact_y_slider.on_change = self._on_style_change
-        self.impact_y_slider.width = 220
+        self.impact_y_slider.width = 170
         self.impact_y_slider.rotate = ft.Rotate(angle=-1.5708)
         self.impact_bg_checkbox.on_change = self._on_style_change
         super().__init__(spacing=12)
@@ -88,47 +88,64 @@ class ReviewView(ft.Column):
         self._controls.clear()
 
         self.controls.append(ft.Text("最終チェック", size=18, weight=ft.FontWeight.W_600))
-        self.controls.append(ft.Text("タイトル入力と見た目調整ができます。", color=ft.Colors.BLUE_GREY_500))
+        self.controls.append(ft.Text("タイトル入力と見た目調整", color=ft.Colors.BLUE_GREY_500, size=12))
         self.controls.append(
             ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Text("タイトル表示設定（フォント: ゴシック体固定）", weight=ft.FontWeight.W_500),
-                        ft.Text("フォント: Hiragino Sans W6", size=12, color=ft.Colors.BLUE_GREY_500),
-                        ft.Text("フォントサイズ", size=12),
-                        self.font_size_slider,
-                        ft.Text("上下位置（Y）", size=12),
-                        ft.Column(
-                            controls=[
-                                ft.Container(width=44, height=220, content=self.y_slider),
-                                self.y_value_text,
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                            spacing=4,
-                        ),
-                        self.bg_checkbox,
-                        ft.Divider(height=8),
-                        ft.Text("下段一言設定（フォント: ゴシック体固定）", weight=ft.FontWeight.W_500),
-                        ft.Text("下段フォントサイズ", size=12),
-                        self.impact_font_size_slider,
-                        ft.Text("下段上下位置（Y）", size=12),
-                        ft.Column(
-                            controls=[
-                                ft.Container(width=44, height=220, content=self.impact_y_slider),
-                                self.impact_y_value_text,
-                            ],
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                            spacing=4,
-                        ),
-                        self.impact_bg_checkbox,
-                        ft.Text("簡易プレビュー（最後に編集したタイトルを表示）", size=12),
+                content=ft.Row(
+                    controls=[
                         ft.Container(
-                            content=self.preview_stack,
-                            border=ft.border.all(1, ft.Colors.BLUE_GREY_300),
-                            border_radius=6,
+                            width=360,
+                            content=ft.Column(
+                                [
+                                    ft.Text("タイトル設定", weight=ft.FontWeight.W_500),
+                                    ft.Text("サイズ", size=11),
+                                    self.font_size_slider,
+                                    ft.Row(
+                                        controls=[
+                                            ft.Text("Y", size=11),
+                                            ft.Container(width=44, height=170, content=self.y_slider),
+                                            self.y_value_text,
+                                            self.bg_checkbox,
+                                        ],
+                                        spacing=8,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                    ft.Divider(height=8),
+                                    ft.Text("下段一言設定", weight=ft.FontWeight.W_500),
+                                    ft.Text("サイズ", size=11),
+                                    self.impact_font_size_slider,
+                                    ft.Row(
+                                        controls=[
+                                            ft.Text("Y", size=11),
+                                            ft.Container(width=44, height=170, content=self.impact_y_slider),
+                                            self.impact_y_value_text,
+                                            self.impact_bg_checkbox,
+                                        ],
+                                        spacing=8,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                ],
+                                spacing=4,
+                                tight=True,
+                            ),
+                        ),
+                        ft.Container(
+                            content=ft.Column(
+                                controls=[
+                                    ft.Text("簡易プレビュー", size=12),
+                                    ft.Container(
+                                        content=self.preview_stack,
+                                        border=ft.border.all(1, ft.Colors.BLUE_GREY_300),
+                                        border_radius=6,
+                                    ),
+                                ],
+                                spacing=4,
+                            ),
                         ),
                     ],
-                    spacing=4,
+                    spacing=14,
+                    wrap=True,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
                 ),
                 padding=10,
                 border=ft.border.all(1, ft.Colors.BLUE_GREY_200),
