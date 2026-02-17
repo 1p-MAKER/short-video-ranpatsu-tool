@@ -40,6 +40,8 @@ class ReviewView(ft.Column):
             color=ft.Colors.WHITE,
             weight=ft.FontWeight.W_700,
             text_align=ft.TextAlign.CENTER,
+            max_lines=3,
+            width=self.preview_width - 20,
         )
         self.preview_title_box = ft.Container(
             left=0,
@@ -79,12 +81,12 @@ class ReviewView(ft.Column):
         )
         self.font_size_slider.on_change = self._on_style_change
         self.y_slider.on_change = self._on_style_change
-        self.y_slider.width = 170
+        self.y_slider.width = 240
         self.y_slider.rotate = ft.Rotate(angle=-1.5708)
         self.bg_checkbox.on_change = self._on_style_change
         self.impact_font_size_slider.on_change = self._on_style_change
         self.impact_y_slider.on_change = self._on_style_change
-        self.impact_y_slider.width = 170
+        self.impact_y_slider.width = 240
         self.impact_y_slider.rotate = ft.Rotate(angle=-1.5708)
         self.impact_bg_checkbox.on_change = self._on_style_change
         super().__init__(spacing=12)
@@ -110,7 +112,7 @@ class ReviewView(ft.Column):
                                     ft.Row(
                                         controls=[
                                             ft.Text("Y", size=11),
-                                            ft.Container(width=44, height=170, content=self.y_slider),
+                                            ft.Container(width=44, height=240, content=self.y_slider),
                                             self.y_value_text,
                                             self.bg_checkbox,
                                         ],
@@ -124,7 +126,7 @@ class ReviewView(ft.Column):
                                     ft.Row(
                                         controls=[
                                             ft.Text("Y", size=11),
-                                            ft.Container(width=44, height=170, content=self.impact_y_slider),
+                                            ft.Container(width=44, height=240, content=self.impact_y_slider),
                                             self.impact_y_value_text,
                                             self.impact_bg_checkbox,
                                         ],

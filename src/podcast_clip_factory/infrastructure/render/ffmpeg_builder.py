@@ -29,7 +29,7 @@ class FFmpegCommandBuilder:
         filter_graph = self._build_filter_graph(
             subtitle_path=subtitle_path,
             title_text=candidate.title,
-            impact_text=(candidate.punchline or ""),
+            impact_text=self._wrap_text(candidate.punchline or "", max_chars=14),
             title_style=style,
             impact_style=lower_style,
             speech_intervals=speech_intervals or [],
@@ -139,3 +139,10 @@ class FFmpegCommandBuilder:
             impact_background_opacity=impact_style.background_opacity,
             impact_background_padding=impact_style.background_padding,
         )
+
+    def _wrap_text(self, text: str, max_chars: int) -> str:
+        raw = (text or "").strip()
+        if not raw:
+            return ""
+        chunks = [raw[i : i + max_chars] for i in range(0, len(raw), max_chars)]
+        return "\n".join(chunks[:3])

@@ -26,6 +26,7 @@ def build_filtergraph(
 ) -> str:
     safe_title = (
         title_text.replace("\\", r"\\")
+        .replace("\n", r"\n")
         .replace(":", r"\\:")
         .replace(",", r"\,")
         .replace("'", r"\\'")
@@ -33,6 +34,7 @@ def build_filtergraph(
     )
     safe_impact = (
         impact_text.replace("\\", r"\\")
+        .replace("\n", r"\n")
         .replace(":", r"\\:")
         .replace(",", r"\,")
         .replace("'", r"\\'")

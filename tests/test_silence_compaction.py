@@ -82,7 +82,16 @@ def test_build_speech_intervals_compacts_gaps():
 def test_ffmpeg_builder_uses_concat_when_speech_intervals_given():
     render = RenderConfig(1080, 1920, 1080, 608, 40, "h264_videotoolbox", "aac", "192k")
     builder = FFmpegCommandBuilder(render)
-    candidate = ClipCandidate("c1", 0, 30, "title", "hook", "reason", 0.8, punchline="impact")
+    candidate = ClipCandidate(
+        "c1",
+        0,
+        30,
+        "title",
+        "hook",
+        "reason",
+        0.8,
+        punchline="これはとても長いインパクトの一言テキストです",
+    )
     cmd = builder.build(
         input_video=Path("in.mp4"),
         output_video=Path("out.mp4"),
@@ -92,4 +101,5 @@ def test_ffmpeg_builder_uses_concat_when_speech_intervals_given():
     )
     graph = cmd[cmd.index("-filter_complex") + 1]
     assert "concat=n=2:v=1:a=1[srcv][srca]" in graph
+    assert r"\n" in graph
     assert cmd[cmd.index("-map") + 3] == "[srca]"
