@@ -67,11 +67,16 @@ class GeminiClipAnalyzer:
         min_sec: int,
         max_sec: int,
     ) -> str:
+        transcript_with_time = "\n".join(
+            f"[{self._fmt_sec(seg.start)}-{self._fmt_sec(seg.end)}] {seg.text.strip()}"
+            for seg in transcript.segments
+            if seg.text.strip()
+        )
         return (
             f"target_count={target_count}, min_sec={min_sec}, max_sec={max_sec}, "
             f"duration_sec={media_info.duration_sec}\n\n"
-            "Transcript:\n"
-            f"{transcript.full_text}"
+            "TranscriptWithTimestamps:\n"
+            f"{transcript_with_time}"
         )
 
     def _request_json(self, url: str, payload: dict[str, Any], timeout_sec: int = 90) -> dict[str, Any]:
@@ -198,3 +203,9 @@ class GeminiClipAnalyzer:
             return ssl.create_default_context(cafile=certifi.where())
         except Exception:
             return ssl.create_default_context()
+
+    def _fmt_sec(self, value: float) -> str:
+        total = max(0, int(value))
+        mins = total // 60
+        secs = total % 60
+        return f"{mins:02d}:{secs:02d}"
