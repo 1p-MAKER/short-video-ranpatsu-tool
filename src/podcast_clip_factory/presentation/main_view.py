@@ -37,7 +37,8 @@ class MainView(ft.Column):
 
         self.path_text = ft.Text("動画未選択", size=13)
         self.pick_button = ft.ElevatedButton("動画を選択", on_click=self._on_pick_clicked)
-        self.start_button = ft.ElevatedButton("自動生成を開始", disabled=True, on_click=self._on_start)
+        self.start_button = ft.ElevatedButton("自動生成を開始", disabled=True, on_click=self._on_start, visible=False)
+        self.stop_button = ft.ElevatedButton("停止", disabled=True, on_click=self._on_stop)
 
         self.progress_view = ProgressView()
         self.runtime_text = ft.Text("稼働状態: 待機", size=13, color=ft.Colors.BLUE_GREY_700)
@@ -66,7 +67,7 @@ class MainView(ft.Column):
             controls=[
                 ft.Text("ショート動画乱発ツール", size=24, weight=ft.FontWeight.BOLD),
                 ft.Text("開始から最終チェック手前まで全自動。最後だけ手動確認。", size=13),
-                ft.Row([self.pick_button, self.start_button], spacing=10),
+                ft.Row([self.pick_button, self.stop_button], spacing=10),
                 self.path_text,
                 ft.Divider(),
                 self.progress_view,
@@ -96,10 +97,13 @@ class MainView(ft.Column):
             return
         self.selected_video = Path(files[0].path)
         self.path_text.value = f"選択中: {self.selected_video}"
-        self.start_button.disabled = False
         self._page.update()
+        self._on_start(None)
 
-    def _on_start(self, _: ft.ControlEvent) -> None:
+    def _on_start(self, _: ft.ControlEvent | None) -> None:
+        if self._job_running:
+            return
+
         preflight_errors = self.orchestrator.preflight(self.selected_video)
         if preflight_errors:
             self._toast(preflight_errors[0])
@@ -109,6 +113,7 @@ class MainView(ft.Column):
 
         self.start_button.disabled = True
         self.pick_button.disabled = True
+        self.stop_button.disabled = False
         self.submit_button.visible = False
         self.review_view.controls.clear()
         self.result_view.summary.value = ""
@@ -168,6 +173,7 @@ class MainView(ft.Column):
         self.submit_button.disabled = True
         self.start_button.disabled = True
         self.pick_button.disabled = True
+        self.stop_button.disabled = False
         self.progress_view.set("確定出力レンダリング中", 0.99)
         self._append_log("確定出力を開始しました（タイトル編集内容を反映）")
         self._set_running(True)
@@ -201,6 +207,7 @@ class MainView(ft.Column):
         self.open_output_button.visible = True
         self.start_button.disabled = False
         self.pick_button.disabled = False
+        self.stop_button.disabled = True
         self.submit_button.visible = False
         self.submit_button.disabled = False
         self.progress_view.set("確定出力が完了しました", 1.0)
@@ -213,6 +220,7 @@ class MainView(ft.Column):
         self.progress_view.set("失敗", 0.0)
         self.start_button.disabled = False
         self.pick_button.disabled = False
+        self.stop_button.disabled = True
         self.submit_button.disabled = False
         self.submit_button.visible = False
         self._toast(f"エラー: {message}")
@@ -250,7 +258,17 @@ class MainView(ft.Column):
 
         self._job_running = False
         self._stop_heartbeat()
+        self.stop_button.disabled = True
         self.runtime_text.value = "稼働状態: 待機"
+
+    def _on_stop(self, _: ft.ControlEvent) -> None:
+        if not self._job_running:
+            return
+        self.stop_button.disabled = True
+        self.orchestrator.request_stop()
+        self._append_log("停止要求を送信しました")
+        self._toast("停止要求を送信しました。現在の処理が中断され次第停止します。")
+        self._page.update()
 
     def _start_heartbeat(self) -> None:
         self._stop_heartbeat()

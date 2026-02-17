@@ -42,6 +42,17 @@ class PipelineExecutor:
         self.rule_engine = rule_engine
         self.renderer = renderer
         self.logger = logger
+        self._cancel_event = Event()
+
+    def request_stop(self) -> None:
+        self._cancel_event.set()
+
+    def clear_stop(self) -> None:
+        self._cancel_event.clear()
+
+    @property
+    def cancel_event(self):
+        return self._cancel_event
 
     def run(
         self,
@@ -49,11 +60,13 @@ class PipelineExecutor:
         on_progress: ProgressCallback | None = None,
         on_log: LogCallback | None = None,
     ) -> PipelineResult:
+        self.clear_stop()
         job = self.repo.create_job(input_video)
         self.logger.info("job.created", job_id=job.job_id, input_path=str(input_video))
         self._emit_log(on_log, f"ジョブ作成: {job.job_id}")
 
         try:
+            self._check_cancel(job.job_id, on_log)
             self._update_status(
                 job.job_id,
                 JobStatus.PREPROCESSING,
@@ -76,9 +89,11 @@ class PipelineExecutor:
                 f"想定所要時間: {self._estimate_total_minutes(media_info.duration_sec):.1f}分前後",
             )
             self._ensure_cloud_available(on_log=on_log)
-            extract_audio(input_video, audio_path)
+            self._check_cancel(job.job_id, on_log)
+            extract_audio(input_video, audio_path, cancel_event=self._cancel_event)
             self._emit_log(on_log, "音声抽出が完了しました")
 
+            self._check_cancel(job.job_id, on_log)
             self._update_status(
                 job.job_id,
                 JobStatus.TRANSCRIBING,
@@ -99,6 +114,7 @@ class PipelineExecutor:
             self.store.save_transcript(job.job_id, transcript)
             self._emit_log(on_log, "文字起こしを保存しました")
 
+            self._check_cancel(job.job_id, on_log)
             self._update_status(
                 job.job_id,
                 JobStatus.SELECTING,
@@ -116,6 +132,7 @@ class PipelineExecutor:
             )
             self._emit_log(on_log, f"候補抽出ソース: {selection_source}")
             final_candidates = self.rule_engine.finalize(raw_candidates, transcript)
+            self._check_cancel(job.job_id, on_log)
             if len(final_candidates) < self.settings.app.min_clips:
                 raise RuntimeError(
                     f"Failed to secure minimum clips: {len(final_candidates)}/{self.settings.app.min_clips}"
@@ -129,6 +146,7 @@ class PipelineExecutor:
             )
             self.repo.save_candidates(job.job_id, final_candidates)
 
+            self._check_cancel(job.job_id, on_log)
             self._update_status(
                 job.job_id,
                 JobStatus.RENDERING,
@@ -148,6 +166,7 @@ class PipelineExecutor:
             self.repo.save_rendered(job.job_id, rendered)
             self._emit_log(on_log, "レンダリングを保存しました")
 
+            self._check_cancel(job.job_id, on_log)
             metadata = {
                 "job_id": job.job_id,
                 "input_video": str(input_video),
@@ -211,11 +230,17 @@ class PipelineExecutor:
     def _transcribe(self, audio_path: Path, on_log: LogCallback | None = None) -> Transcript:
         try:
             self._emit_log(on_log, "文字起こし: mlx-whisper を使用します")
-            return self.primary_transcriber.transcribe(audio_path)
+            try:
+                return self.primary_transcriber.transcribe(audio_path, cancel_event=self._cancel_event)
+            except TypeError:
+                return self.primary_transcriber.transcribe(audio_path)
         except Exception as primary_error:
             self.logger.warning("transcribe.primary_failed", error=str(primary_error))
             self._emit_log(on_log, f"mlx-whisper失敗。faster-whisperに切替: {primary_error}")
-            return self.fallback_transcriber.transcribe(audio_path)
+            try:
+                return self.fallback_transcriber.transcribe(audio_path, cancel_event=self._cancel_event)
+            except TypeError:
+                return self.fallback_transcriber.transcribe(audio_path)
 
     def _select_candidates(self, transcript: Transcript, media_info, on_log: LogCallback | None = None):
         def primary_call():
@@ -293,15 +318,25 @@ class PipelineExecutor:
                 candidates=candidates,
                 transcript=transcript,
                 on_event=on_event,
+                cancel_event=self._cancel_event,
             )
         except TypeError:
             # Backward-compatible path for renderers without progress callback support.
-            return self.renderer.render(
-                input_video=input_video,
-                output_dir=self.store.output_dir(job_id),
-                candidates=candidates,
-                transcript=transcript,
-            )
+            try:
+                return self.renderer.render(
+                    input_video=input_video,
+                    output_dir=self.store.output_dir(job_id),
+                    candidates=candidates,
+                    transcript=transcript,
+                    on_event=on_event,
+                )
+            except TypeError:
+                return self.renderer.render(
+                    input_video=input_video,
+                    output_dir=self.store.output_dir(job_id),
+                    candidates=candidates,
+                    transcript=transcript,
+                )
 
     def _run_with_heartbeat(
         self,
@@ -328,6 +363,8 @@ class PipelineExecutor:
         start = monotonic()
         last_log_elapsed = -15
         while not finished.wait(1.0):
+            if self._cancel_event.is_set():
+                raise RuntimeError("ユーザー停止要求により処理を中断しました")
             elapsed = int(monotonic() - start)
             if on_progress:
                 on_progress(f"{phase_label} 実行中（{self._format_elapsed(elapsed)}経過）", base_progress)
@@ -335,6 +372,8 @@ class PipelineExecutor:
                 self._emit_log(on_log, f"{phase_label} 実行中（{self._format_elapsed(elapsed)}経過）")
                 last_log_elapsed = elapsed
 
+        if self._cancel_event.is_set():
+            raise RuntimeError("ユーザー停止要求により処理を中断しました")
         if "error" in error_holder:
             raise error_holder["error"]
         return result_holder.get("value")
@@ -377,9 +416,19 @@ class PipelineExecutor:
     def _ensure_cloud_available(self, on_log: LogCallback | None = None) -> None:
         if not self.settings.llm.require_cloud:
             return
+        if self._cancel_event.is_set():
+            raise RuntimeError("ユーザー停止要求により処理を中断しました")
         checker = getattr(self.analyzer, "check_availability", None)
         if not callable(checker):
             return
         self._emit_log(on_log, "クラウド接続チェック: Gemini")
         checker()
         self._emit_log(on_log, "クラウド接続チェック: OK")
+
+    def _check_cancel(self, job_id: str, on_log: LogCallback | None) -> None:
+        if not self._cancel_event.is_set():
+            return
+        message = "ユーザー停止要求により処理を中断しました"
+        self._emit_log(on_log, message)
+        self.repo.update_status(job_id, JobStatus.FAILED, message)
+        raise RuntimeError(message)

@@ -20,7 +20,10 @@ class FasterWhisperTranscriber:
             self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
         return self._model
 
-    def transcribe(self, audio_path: Path) -> Transcript:
+    def transcribe(self, audio_path: Path, cancel_event=None) -> Transcript:
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("transcription cancelled")
+
         model = self._get_model()
         segments_iter, info = model.transcribe(
             str(audio_path),
@@ -30,6 +33,8 @@ class FasterWhisperTranscriber:
 
         segments: list[TranscriptSegment] = []
         for seg in segments_iter:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("transcription cancelled")
             words: list[WordToken] = []
             for word in getattr(seg, "words", []) or []:
                 words.append(WordToken(word=word.word.strip(), start=float(word.start), end=float(word.end)))

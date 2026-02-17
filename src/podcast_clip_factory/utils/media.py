@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from pathlib import Path
 
 from podcast_clip_factory.domain.models import MediaInfo
@@ -11,10 +12,35 @@ class CommandError(RuntimeError):
     pass
 
 
-def run_command(cmd: list[str]) -> None:
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise CommandError(f"Command failed: {' '.join(cmd)}\n{proc.stderr}")
+def run_command(cmd: list[str], cancel_event=None) -> None:
+    if cancel_event is None:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise CommandError(f"Command failed: {' '.join(cmd)}\n{proc.stderr}")
+        return
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        while True:
+            if cancel_event.is_set():
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                raise CommandError(f"Command cancelled: {' '.join(cmd)}")
+
+            ret = proc.poll()
+            if ret is not None:
+                break
+            time.sleep(0.2)
+
+        stdout, stderr = proc.communicate()
+        if ret != 0:
+            raise CommandError(f"Command failed: {' '.join(cmd)}\n{stderr}")
+    finally:
+        if proc.poll() is None:
+            proc.kill()
 
 
 def ffprobe_media(input_path: Path) -> MediaInfo:
@@ -50,7 +76,7 @@ def ffprobe_media(input_path: Path) -> MediaInfo:
     )
 
 
-def extract_audio(input_video: Path, output_wav: Path) -> None:
+def extract_audio(input_video: Path, output_wav: Path, cancel_event=None) -> None:
     cmd = [
         "ffmpeg",
         "-y",
@@ -65,4 +91,4 @@ def extract_audio(input_video: Path, output_wav: Path) -> None:
         "16000",
         str(output_wav),
     ]
-    run_command(cmd)
+    run_command(cmd, cancel_event=cancel_event)

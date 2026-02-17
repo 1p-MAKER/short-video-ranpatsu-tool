@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from podcast_clip_factory.domain.models import Transcript, TranscriptSegment, WordToken
@@ -14,8 +15,8 @@ class MLXWhisperTranscriber:
         self.model = model
         self.word_timestamps = word_timestamps
 
-    def transcribe(self, audio_path: Path) -> Transcript:
-        result = self._run_mlx_in_subprocess(audio_path)
+    def transcribe(self, audio_path: Path, cancel_event=None) -> Transcript:
+        result = self._run_mlx_in_subprocess(audio_path, cancel_event=cancel_event)
 
         segments: list[TranscriptSegment] = []
         for seg in result.get("segments", []):
@@ -43,7 +44,7 @@ class MLXWhisperTranscriber:
             duration_sec=float(result.get("duration", 0.0)) if result.get("duration") else 0.0,
         )
 
-    def _run_mlx_in_subprocess(self, audio_path: Path) -> dict:
+    def _run_mlx_in_subprocess(self, audio_path: Path, cancel_event=None) -> dict:
         script = (
             "import json, sys\n"
             "from mlx_whisper import transcribe\n"
@@ -68,13 +69,41 @@ class MLXWhisperTranscriber:
             "1" if self.word_timestamps else "0",
             str(tmp_path),
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if cancel_event is None:
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            try:
+                if proc.returncode != 0:
+                    stderr_msg = proc.stderr.strip() or proc.stdout.strip() or "unknown mlx-whisper failure"
+                    raise RuntimeError(
+                        f"mlx-whisper subprocess failed (code={proc.returncode}): {stderr_msg}"
+                    )
+                return json.loads(tmp_path.read_text(encoding="utf-8"))
+            finally:
+                tmp_path.unlink(missing_ok=True)
+
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            if proc.returncode != 0:
-                stderr = proc.stderr.strip() or proc.stdout.strip() or "unknown mlx-whisper failure"
+            while True:
+                if cancel_event is not None and cancel_event.is_set():
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                    raise RuntimeError("transcription cancelled")
+                ret = proc.poll()
+                if ret is not None:
+                    break
+                time.sleep(0.2)
+
+            stdout, stderr = proc.communicate()
+            if ret != 0:
+                stderr_msg = stderr.strip() or stdout.strip() or "unknown mlx-whisper failure"
                 raise RuntimeError(
-                    f"mlx-whisper subprocess failed (code={proc.returncode}): {stderr}"
+                    f"mlx-whisper subprocess failed (code={ret}): {stderr_msg}"
                 )
             return json.loads(tmp_path.read_text(encoding="utf-8"))
         finally:
+            if proc.poll() is None:
+                proc.kill()
             tmp_path.unlink(missing_ok=True)

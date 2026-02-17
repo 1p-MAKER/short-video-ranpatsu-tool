@@ -42,6 +42,7 @@ class LocalFFmpegRenderer:
         title_style: TitleOverlayStyle | None = None,
         impact_style: ImpactOverlayStyle | None = None,
         on_event: Callable[[str, int, int, str], None] | None = None,
+        cancel_event=None,
     ) -> list[RenderedClip]:
         clips_dir = output_dir / "clips"
         clips_dir.mkdir(parents=True, exist_ok=True)
@@ -65,6 +66,7 @@ class LocalFFmpegRenderer:
                     impact_style,
                     total,
                     on_event,
+                    cancel_event,
                 ): idx
                 for idx, candidate in enumerate(candidates, start=1)
             }
@@ -89,7 +91,11 @@ class LocalFFmpegRenderer:
         impact_style: ImpactOverlayStyle | None,
         total: int,
         on_event: Callable[[str, int, int, str], None] | None,
+        cancel_event=None,
     ) -> RenderedClip:
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("processing cancelled")
+
         safe_title = sanitize_filename(candidate.title)
         clip_filename = f"clip_{idx:02d}_{safe_title}.mp4"
         output_path = clips_dir / clip_filename
@@ -125,7 +131,7 @@ class LocalFFmpegRenderer:
         )
 
         try:
-            run_command(cmd)
+            run_command(cmd, cancel_event=cancel_event)
         except Exception:
             try:
                 fallback = self.command_builder.build(
@@ -138,7 +144,7 @@ class LocalFFmpegRenderer:
                     speech_intervals=speech_intervals,
                     fallback_software_codec=True,
                 )
-                run_command(fallback)
+                run_command(fallback, cancel_event=cancel_event)
             except Exception:
                 if on_event:
                     on_event("failed", idx, total, candidate.title)

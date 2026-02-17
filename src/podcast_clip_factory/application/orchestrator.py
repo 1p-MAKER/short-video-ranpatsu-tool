@@ -26,6 +26,9 @@ class AppOrchestrator:
     def run_pipeline(self, input_video: Path, on_progress=None, on_log=None):
         return self.executor.run(input_video=input_video, on_progress=on_progress, on_log=on_log)
 
+    def request_stop(self) -> None:
+        self.executor.request_stop()
+
     def preflight(self, input_video: Path | None) -> list[str]:
         errors: list[str] = []
         if input_video is None:
@@ -49,6 +52,7 @@ class AppOrchestrator:
         impact_texts: dict[str, str] | None = None,
         on_log=None,
     ) -> dict:
+        self.executor.clear_stop()
         self.repo.save_review_decisions(job_id, decisions)
 
         selected_rows = self.repo.load_selected_final(job_id)
@@ -101,6 +105,7 @@ class AppOrchestrator:
                 title_style=title_style,
                 impact_style=impact_style,
                 on_event=_on_render_event,
+                cancel_event=self.executor.cancel_event,
             )
 
             for idx, row in enumerate(selected_rows, start=1):
