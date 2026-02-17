@@ -7,19 +7,26 @@ from podcast_clip_factory.domain.models import ImpactOverlayStyle, ReviewDecisio
 
 class ReviewView(ft.Column):
     def __init__(self) -> None:
+        self.canvas_width = 1080
+        self.canvas_height = 1920
+        self.center_height = 608
+        self.center_top = int((self.canvas_height - self.center_height) / 2)  # 656
+        self.center_bottom = self.center_top + self.center_height  # 1264
+        self.safe_margin = 24
+
         self._rows: list[dict] = []
         self._controls: list[tuple[str, ft.Checkbox, ft.TextField, ft.TextField]] = []
-        self.font_size_slider = ft.Slider(min=24, max=140, value=56, label="{value}")
-        self.y_slider = ft.Slider(min=-5000, max=5000, value=58, label="{value}")
-        self.y_value_text = ft.Text("58", size=11, color=ft.Colors.BLUE_GREY_600)
+        self.font_size_slider = ft.Slider(min=24, max=140, value=56, divisions=116, label="{value}")
+        self.y_slider = ft.Slider(min=24, max=608, value=96, divisions=584, label="{value}")
+        self.y_value_text = ft.Text("96", size=11, color=ft.Colors.BLUE_GREY_600)
         self.bg_checkbox = ft.Checkbox(label="タイトル背景を表示", value=True)
-        self.impact_font_size_slider = ft.Slider(min=20, max=120, value=48, label="{value}")
-        self.impact_y_slider = ft.Slider(min=-5000, max=5000, value=1480, label="{value}")
-        self.impact_y_value_text = ft.Text("1480", size=11, color=ft.Colors.BLUE_GREY_600)
+        self.impact_font_size_slider = ft.Slider(min=20, max=120, value=48, divisions=100, label="{value}")
+        self.impact_y_slider = ft.Slider(min=1288, max=1876, value=1520, divisions=588, label="{value}")
+        self.impact_y_value_text = ft.Text("1520", size=11, color=ft.Colors.BLUE_GREY_600)
         self.impact_bg_checkbox = ft.Checkbox(label="一言背景を表示", value=True)
         self.preview_scale = 0.24  # 1080x1920 -> 259x460 preview
-        self.preview_width = int(1080 * self.preview_scale)
-        self.preview_height = int(1920 * self.preview_scale)
+        self.preview_width = int(self.canvas_width * self.preview_scale)
+        self.preview_height = int(self.canvas_height * self.preview_scale)
         self.preview_title_text = ft.Text(
             "タイトルプレビュー",
             size=max(10, int(56 * self.preview_scale)),
@@ -37,7 +44,7 @@ class ReviewView(ft.Column):
         self.preview_title_box = ft.Container(
             left=0,
             right=0,
-            top=max(0, int(58 * self.preview_scale)),
+            top=max(0, int(96 * self.preview_scale)),
             padding=8,
             bgcolor=ft.Colors.with_opacity(0.55, ft.Colors.BLACK),
             content=self.preview_title_text,
@@ -45,7 +52,7 @@ class ReviewView(ft.Column):
         self.preview_impact_box = ft.Container(
             left=0,
             right=0,
-            top=max(0, int(1480 * self.preview_scale)),
+            top=max(0, int(1520 * self.preview_scale)),
             padding=8,
             bgcolor=ft.Colors.with_opacity(0.55, ft.Colors.BLACK),
             content=self.preview_impact_text,
@@ -60,8 +67,8 @@ class ReviewView(ft.Column):
                 ft.Container(
                     left=0,
                     right=0,
-                    top=int((self.preview_height - int(608 * self.preview_scale)) / 2),
-                    height=int(608 * self.preview_scale),
+                    top=int((self.preview_height - int(self.center_height * self.preview_scale)) / 2),
+                    height=int(self.center_height * self.preview_scale),
                     bgcolor=ft.Colors.BLUE_GREY_900,
                 ),
                 self.preview_title_box,
@@ -202,18 +209,20 @@ class ReviewView(ft.Column):
         return decisions
 
     def collect_title_style(self) -> TitleOverlayStyle:
+        font_size = int(self.font_size_slider.value or 56)
         return TitleOverlayStyle(
             font_name="Hiragino Sans W6",
-            font_size=int(self.font_size_slider.value or 56),
-            y=int(self.y_slider.value or 58),
+            font_size=font_size,
+            y=self._clamp_title_y(int(self.y_slider.value or 96), font_size),
             background=bool(self.bg_checkbox.value),
         )
 
     def collect_impact_style(self) -> ImpactOverlayStyle:
+        font_size = int(self.impact_font_size_slider.value or 48)
         return ImpactOverlayStyle(
             font_name="Hiragino Sans W6",
-            font_size=int(self.impact_font_size_slider.value or 48),
-            y=int(self.impact_y_slider.value or 1480),
+            font_size=font_size,
+            y=self._clamp_impact_y(int(self.impact_y_slider.value or 1520), font_size),
             background=bool(self.impact_bg_checkbox.value),
         )
 
@@ -238,11 +247,13 @@ class ReviewView(ft.Column):
 
     def _sync_preview(self) -> None:
         font_size = int(self.font_size_slider.value or 56)
-        y = int(self.y_slider.value or 58)
+        y = self._clamp_title_y(int(self.y_slider.value or 96), font_size)
         background = bool(self.bg_checkbox.value)
         impact_font_size = int(self.impact_font_size_slider.value or 48)
-        impact_y = int(self.impact_y_slider.value or 1480)
+        impact_y = self._clamp_impact_y(int(self.impact_y_slider.value or 1520), impact_font_size)
         impact_background = bool(self.impact_bg_checkbox.value)
+        self.y_slider.value = y
+        self.impact_y_slider.value = impact_y
         self.y_value_text.value = str(y)
         self.impact_y_value_text.value = str(impact_y)
 
@@ -261,7 +272,19 @@ class ReviewView(ft.Column):
         self.preview_impact_box.padding = 8 if impact_background else 0
         try:
             self.preview_stack.update()
+            self.y_slider.update()
+            self.impact_y_slider.update()
             self.y_value_text.update()
             self.impact_y_value_text.update()
         except Exception:
             return
+
+    def _clamp_title_y(self, y: int, font_size: int) -> int:
+        min_y = self.safe_margin
+        max_y = max(min_y, self.center_top - font_size - self.safe_margin)
+        return max(min_y, min(max_y, y))
+
+    def _clamp_impact_y(self, y: int, font_size: int) -> int:
+        min_y = self.center_bottom + self.safe_margin
+        max_y = max(min_y, self.canvas_height - font_size - self.safe_margin)
+        return max(min_y, min(max_y, y))
