@@ -44,7 +44,7 @@ class AppOrchestrator:
 
         selected_rows = self.repo.load_selected_final(job_id)
         job = self.repo.get_job(job_id)
-        final_dir = self.store.final_dir(job_id)
+        final_dir = self._resolve_export_dir(job_id)
         exported = []
 
         if selected_rows:
@@ -111,6 +111,7 @@ class AppOrchestrator:
         payload = {
             "job_id": job_id,
             "selected_count": len(exported),
+            "final_dir": str(final_dir),
             "clips": exported,
             "title_style": {
                 "font_name": title_style.font_name if title_style else "Hiragino Sans W6",
@@ -123,3 +124,14 @@ class AppOrchestrator:
         self.repo.update_status(job_id, JobStatus.COMPLETED)
         self.logger.info("job.completed", job_id=job_id, selected_count=len(exported))
         return payload
+
+    def _resolve_export_dir(self, job_id: str) -> Path:
+        base = Path(self.executor.settings.app.default_media_dir).expanduser()
+        target = base / f"shorts_{job_id}"
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            return target
+        except Exception:
+            fallback = self.store.final_dir(job_id)
+            fallback.mkdir(parents=True, exist_ok=True)
+            return fallback

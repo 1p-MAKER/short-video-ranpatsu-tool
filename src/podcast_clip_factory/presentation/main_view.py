@@ -30,6 +30,7 @@ class MainView(ft.Column):
         self._last_progress_at = 0.0
         self._last_progress_message = ""
         self._log_lines: list[str] = []
+        self._default_media_dir = Path(orchestrator.executor.settings.app.default_media_dir).expanduser()
 
         self.file_picker = ft.FilePicker()
         self._page.services.append(self.file_picker)
@@ -84,7 +85,13 @@ class MainView(ft.Column):
         )
 
     async def _on_pick_clicked(self, _: ft.ControlEvent) -> None:
-        files = await self.file_picker.pick_files(allow_multiple=False)
+        initial_dir = (
+            str(self._default_media_dir) if self._default_media_dir.exists() else None
+        )
+        files = await self.file_picker.pick_files(
+            allow_multiple=False,
+            initial_directory=initial_dir,
+        )
         if not files:
             return
         self.selected_video = Path(files[0].path)
@@ -184,7 +191,7 @@ class MainView(ft.Column):
         if not self.current_job_id:
             self._on_error("ジョブ情報が見つかりません")
             return
-        final_dir = self.orchestrator.store.final_dir(self.current_job_id)
+        final_dir = Path(payload.get("final_dir") or self.orchestrator.store.final_dir(self.current_job_id))
         self._last_final_dir = final_dir
         self.result_view.set_result(payload["selected_count"], str(final_dir))
         self.open_output_button.visible = True

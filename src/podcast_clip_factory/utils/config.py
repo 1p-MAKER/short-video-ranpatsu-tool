@@ -16,6 +16,7 @@ class AppConfig:
     render_parallelism: int
     manual_start_only: bool
     max_render_retries: int
+    default_media_dir: str = "/Volumes/1peiHDD_2TB/DaVinciResolve_material_HDD/RADIO"
 
 
 @dataclass(slots=True)
@@ -93,6 +94,9 @@ def load_settings(root_dir: Path) -> Settings:
             render_parallelism=max(1, int(app["render_parallelism"])),
             manual_start_only=bool(app["manual_start_only"]),
             max_render_retries=int(app["max_render_retries"]),
+            default_media_dir=str(
+                app.get("default_media_dir", "/Volumes/1peiHDD_2TB/DaVinciResolve_material_HDD/RADIO")
+            ),
         ),
         transcribe=TranscribeConfig(
             primary=str(trans["primary"]),

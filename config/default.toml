@@ -7,6 +7,7 @@ title_max_chars = 28
 render_parallelism = 3
 manual_start_only = true
 max_render_retries = 1
+default_media_dir = "/Volumes/1peiHDD_2TB/DaVinciResolve_material_HDD/RADIO"
 
 [transcribe]
 primary = "mlx_whisper"
