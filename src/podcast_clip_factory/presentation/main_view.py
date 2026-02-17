@@ -202,6 +202,7 @@ class MainView(ft.Column):
         self.progress_view.set("確定出力が完了しました", 1.0)
         self._set_running(False)
         self._toast("確定出力が完了しました")
+        self._open_output_folder()
         self._page.update()
 
     def _on_error(self, message: str) -> None:
@@ -221,6 +222,9 @@ class MainView(ft.Column):
         self._page.update()
 
     def _on_open_output(self, _: ft.ControlEvent) -> None:
+        self._open_output_folder()
+
+    def _open_output_folder(self) -> None:
         if self._last_final_dir is None or not self._last_final_dir.exists():
             self._toast("出力フォルダが見つかりません")
             return
