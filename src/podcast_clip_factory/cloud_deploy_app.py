@@ -94,7 +94,7 @@ class CloudDeployApp(ft.Column):
 
     def __init__(self, page: ft.Page):
         super().__init__(expand=True, spacing=0)
-        self.page = page
+        self._page = page
         self._selected_job: str | None = None
         self._cards: dict[str, JobCard] = {}
         self._is_running = False
@@ -236,7 +236,7 @@ class CloudDeployApp(ft.Column):
                 self._cards[job_id] = card
                 self._job_list.controls.append(card)
 
-        self.page.update()
+        self._page.update()
 
     def _on_select(self, job_id: str):
         if self._is_running:
@@ -247,7 +247,7 @@ class CloudDeployApp(ft.Column):
         self._deploy_btn.disabled = False
         self._status_text.value = f"✅ 選択中: {job_id}"
         self._status_text.color = TEXT_PRIMARY
-        self.page.update()
+        self._page.update()
 
     def _on_refresh(self, _e):
         if self._is_running:
@@ -268,7 +268,7 @@ class CloudDeployApp(ft.Column):
         self._log_box.value = ""
         self._status_text.value = "🚀 クラウドに登録中..."
         self._status_text.color = WARNING
-        self.page.update()
+        self._page.update()
 
         threading.Thread(target=self._run_deploy, daemon=True).start()
 
@@ -324,7 +324,7 @@ class CloudDeployApp(ft.Column):
     def _log(self, msg: str):
         current = self._log_box.value or ""
         self._log_box.value = current + msg + "\n" if current else msg + "\n"
-        self.page.update()
+        self._page.update()
 
     def _finish(self, *, success: bool, message: str):
         self._is_running = False
@@ -340,7 +340,7 @@ class CloudDeployApp(ft.Column):
             self._status_text.value = f"⚠️ {message}"
             self._status_text.color = ERROR
 
-        self.page.update()
+        self._page.update()
 
 
 def main():
