@@ -1,7 +1,6 @@
-"""クラウド登録 GUI アプリ (Flet)"""
+"""クラウド登録 GUI アプリ (Flet 0.80+)"""
 from __future__ import annotations
 
-import os
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -17,8 +16,7 @@ except ImportError:
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
-
-# ── テーマカラー ──────────────────────────────────
+# ── テーマカラー ──
 PRIMARY = "#6C63FF"
 PRIMARY_DARK = "#5A52E0"
 SURFACE = "#1E1E2E"
@@ -47,27 +45,26 @@ class JobCard(ft.Container):
         self._selected = selected
 
         self._title = ft.Text(
-            job_id,
+            value=job_id,
             size=15,
             weight=ft.FontWeight.W_600,
             color=TEXT_PRIMARY,
-            font_family="Roboto Mono",
         )
         self._subtitle = ft.Text(
-            f"🎬 {mp4_count}本  ·  📅 {mod_date}",
+            value=f"🎬 {mp4_count}本  ·  📅 {mod_date}",
             size=13,
             color=TEXT_SECONDARY,
         )
         self._check = ft.Icon(
-            ft.Icons.CHECK_CIRCLE_ROUNDED if selected else ft.Icons.RADIO_BUTTON_UNCHECKED,
+            icon=ft.Icons.CHECK_CIRCLE_ROUNDED if selected else ft.Icons.RADIO_BUTTON_UNCHECKED,
             color=PRIMARY if selected else TEXT_SECONDARY,
             size=24,
         )
 
         super().__init__(
             content=ft.Row(
-                [
-                    ft.Column([self._title, self._subtitle], spacing=2, expand=True),
+                controls=[
+                    ft.Column(controls=[self._title, self._subtitle], spacing=2, expand=True),
                     self._check,
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -78,13 +75,12 @@ class JobCard(ft.Container):
             bgcolor=CARD_BG,
             border=ft.border.all(2, PRIMARY) if selected else ft.border.all(1, "#3A3A4C"),
             on_click=on_tap,
-            animate=ft.animation.Animation(200, ft.AnimationCurve.EASE_IN_OUT),
             ink=True,
         )
 
     def set_selected(self, selected: bool):
         self._selected = selected
-        self._check.name = ft.Icons.CHECK_CIRCLE_ROUNDED if selected else ft.Icons.RADIO_BUTTON_UNCHECKED
+        self._check.icon = ft.Icons.CHECK_CIRCLE_ROUNDED if selected else ft.Icons.RADIO_BUTTON_UNCHECKED
         self._check.color = PRIMARY if selected else TEXT_SECONDARY
         self.border = ft.border.all(2, PRIMARY) if selected else ft.border.all(1, "#3A3A4C")
 
@@ -92,9 +88,9 @@ class JobCard(ft.Container):
 class CloudDeployApp(ft.Column):
     """メインアプリケーション"""
 
-    def __init__(self, page: ft.Page):
+    def __init__(self, pg: ft.Page):
         super().__init__(expand=True, spacing=0)
-        self._page = page
+        self._pg = pg
         self._selected_job: str | None = None
         self._cards: dict[str, JobCard] = {}
         self._is_running = False
@@ -102,12 +98,12 @@ class CloudDeployApp(ft.Column):
         # ── UI部品 ──
         self._header = ft.Container(
             content=ft.Row(
-                [
-                    ft.Icon(ft.Icons.CLOUD_UPLOAD_ROUNDED, color=PRIMARY, size=32),
+                controls=[
+                    ft.Icon(icon=ft.Icons.CLOUD_UPLOAD_ROUNDED, color=PRIMARY, size=32),
                     ft.Column(
-                        [
-                            ft.Text("Cloud Deploy", size=24, weight=ft.FontWeight.BOLD, color=TEXT_PRIMARY),
-                            ft.Text("動画をクラウドに登録して自動配信", size=13, color=TEXT_SECONDARY),
+                        controls=[
+                            ft.Text(value="Cloud Deploy", size=24, weight=ft.FontWeight.BOLD, color=TEXT_PRIMARY),
+                            ft.Text(value="動画をクラウドに登録して自動配信", size=13, color=TEXT_SECONDARY),
                         ],
                         spacing=2,
                     ),
@@ -120,7 +116,7 @@ class CloudDeployApp(ft.Column):
 
         self._job_list = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
 
-        self._status_text = ft.Text("ジョブを選択してください", size=13, color=TEXT_SECONDARY)
+        self._status_text = ft.Text(value="ジョブを選択してください", size=13, color=TEXT_SECONDARY)
         self._progress = ft.ProgressBar(visible=False, color=PRIMARY, bgcolor="#3A3A4C")
 
         self._log_box = ft.TextField(
@@ -134,18 +130,12 @@ class CloudDeployApp(ft.Column):
             border_color="#3A3A4C",
             border_radius=8,
             visible=False,
-            text_style=ft.TextStyle(font_family="Roboto Mono"),
         )
 
         self._deploy_btn = ft.ElevatedButton(
-            text="☁️  クラウドに登録",
+            content=ft.Text(value="☁️  クラウドに登録", size=16, weight=ft.FontWeight.W_600),
             bgcolor=PRIMARY,
             color="white",
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=12),
-                padding=ft.padding.symmetric(horizontal=32, vertical=16),
-                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.W_600),
-            ),
             on_click=self._on_deploy,
             disabled=True,
             height=52,
@@ -159,49 +149,33 @@ class CloudDeployApp(ft.Column):
             on_click=self._on_refresh,
         )
 
-        # ── レイアウト組み立て ──
+        # ── レイアウト ──
         self.controls = [
             self._header,
             ft.Divider(height=1, color="#3A3A4C"),
-            # ジョブ一覧ヘッダ
             ft.Container(
                 content=ft.Row(
-                    [
-                        ft.Text("📂 ジョブ一覧", size=14, weight=ft.FontWeight.W_600, color=TEXT_PRIMARY),
+                    controls=[
+                        ft.Text(value="📂 ジョブ一覧", size=14, weight=ft.FontWeight.W_600, color=TEXT_PRIMARY),
                         self._refresh_btn,
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
                 padding=ft.padding.only(left=24, right=16, top=12),
             ),
-            # ジョブリスト
+            ft.Container(content=self._job_list, padding=ft.padding.symmetric(horizontal=24), expand=True),
             ft.Container(
-                content=self._job_list,
-                padding=ft.padding.symmetric(horizontal=24),
-                expand=True,
-            ),
-            # ステータスエリア
-            ft.Container(
-                content=ft.Column(
-                    [
-                        self._progress,
-                        self._status_text,
-                        self._log_box,
-                    ],
-                    spacing=8,
-                ),
+                content=ft.Column(controls=[self._progress, self._status_text, self._log_box], spacing=8),
                 padding=ft.padding.symmetric(horizontal=24, vertical=8),
             ),
-            # デプロイボタン
             ft.Container(
-                content=ft.Row([self._deploy_btn]),
+                content=ft.Row(controls=[self._deploy_btn]),
                 padding=ft.padding.only(left=24, right=24, bottom=20, top=8),
             ),
         ]
 
         self._load_jobs()
 
-    # ── ジョブ読み込み ────────────────────────
     def _load_jobs(self):
         runs_dir = ROOT_DIR / "runs"
         job_dirs = [
@@ -216,7 +190,7 @@ class CloudDeployApp(ft.Column):
         if not job_dirs:
             self._job_list.controls.append(
                 ft.Container(
-                    content=ft.Text("ジョブが見つかりません", color=TEXT_SECONDARY, size=14),
+                    content=ft.Text(value="ジョブが見つかりません", color=TEXT_SECONDARY, size=14),
                     padding=20,
                     alignment=ft.alignment.center,
                 )
@@ -236,7 +210,7 @@ class CloudDeployApp(ft.Column):
                 self._cards[job_id] = card
                 self._job_list.controls.append(card)
 
-        self._page.update()
+        self._pg.update()
 
     def _on_select(self, job_id: str):
         if self._is_running:
@@ -247,29 +221,26 @@ class CloudDeployApp(ft.Column):
         self._deploy_btn.disabled = False
         self._status_text.value = f"✅ 選択中: {job_id}"
         self._status_text.color = TEXT_PRIMARY
-        self._page.update()
+        self._pg.update()
 
     def _on_refresh(self, _e):
         if self._is_running:
             return
         self._load_jobs()
 
-    # ── デプロイ実行 ──────────────────────────
     def _on_deploy(self, _e):
         if not self._selected_job or self._is_running:
             return
-
         self._is_running = True
         self._deploy_btn.disabled = True
-        self._deploy_btn.text = "⏳ アップロード中..."
+        self._deploy_btn.content = ft.Text(value="⏳ アップロード中...", size=16, weight=ft.FontWeight.W_600)
         self._deploy_btn.bgcolor = PRIMARY_DARK
         self._progress.visible = True
         self._log_box.visible = True
         self._log_box.value = ""
         self._status_text.value = "🚀 クラウドに登録中..."
         self._status_text.color = WARNING
-        self._page.update()
-
+        self._pg.update()
         threading.Thread(target=self._run_deploy, daemon=True).start()
 
     def _run_deploy(self):
@@ -291,7 +262,6 @@ class CloudDeployApp(ft.Column):
                 return
 
             self._log(f"対象: {len(items)}件")
-
             uploader = GCSUploader()
             firestore_repo = FirestoreJobRepository()
 
@@ -301,7 +271,6 @@ class CloudDeployApp(ft.Column):
                 if not local_path.exists():
                     self._log(f"⚠️ スキップ: {local_path.name} (ファイルなし)")
                     continue
-
                 blob_name = f"videos/{job_id}/{local_path.name}"
                 self._log(f"[{i+1}/{len(items)}] {local_path.name}")
                 gs_uri = uploader.upload_file(local_path, blob_name)
@@ -324,23 +293,21 @@ class CloudDeployApp(ft.Column):
     def _log(self, msg: str):
         current = self._log_box.value or ""
         self._log_box.value = current + msg + "\n" if current else msg + "\n"
-        self._page.update()
+        self._pg.update()
 
     def _finish(self, *, success: bool, message: str):
         self._is_running = False
         self._progress.visible = False
         self._deploy_btn.disabled = False
-        self._deploy_btn.text = "☁️  クラウドに登録"
+        self._deploy_btn.content = ft.Text(value="☁️  クラウドに登録", size=16, weight=ft.FontWeight.W_600)
         self._deploy_btn.bgcolor = PRIMARY
-
         if success:
             self._status_text.value = f"🎉 {message}"
             self._status_text.color = SUCCESS
         else:
             self._status_text.value = f"⚠️ {message}"
             self._status_text.color = ERROR
-
-        self._page.update()
+        self._pg.update()
 
 
 def main():
@@ -354,8 +321,6 @@ def main():
         page.window.min_height = 600
         page.bgcolor = SURFACE
         page.padding = 0
-        page.fonts = {"Roboto Mono": "https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap"}
-
         app = CloudDeployApp(page)
         page.add(app)
 
